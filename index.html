@@ -168,9 +168,32 @@ function toast(msg){
   t.textContent = msg; t.classList.add("show");
   clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200);
 }
-// Native launching works inside TizenBrew on the TV (tizen.application.launch).
-// In a plain browser (this preview) window.tizen is undefined, so we show a note.
+// On the TV, the module page has NO window.tizen (by design - it's served over
+// localhost). Native app launching goes through service.js, a tiny Node service
+// TizenBrew runs WITH tizen access; it exposes a localhost server we call here.
+// We keep a direct-tizen path (in case a firmware exposes it) and a graceful
+// message for the browser preview (where neither tizen nor the service exist).
+const SERVICE = "http://127.0.0.1:8099";
 const HAS_TIZEN = typeof window.tizen !== "undefined" && !!window.tizen.application;
+
+function launchViaService(appId, label, triesLeft = 6){
+  fetch(SERVICE + "/api/launch", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" }, // simple request -> no CORS preflight
+    body: JSON.stringify({ id: appId })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if(d && d.ok) toast("Opening " + label + "…");
+    else toast("Couldn't launch " + label + (d && d.error ? " (" + d.error + ")" : ""));
+  })
+  .catch(() => {
+    // service may still be booting after the module launches - retry briefly
+    if(triesLeft > 0) setTimeout(() => launchViaService(appId, label, triesLeft - 1), 400);
+    else toast(label + ": launcher service not reachable (works on the TV)");
+  });
+}
+
 function launchNative(appId, label){
   if(HAS_TIZEN){
     try{
@@ -178,9 +201,9 @@ function launchNative(appId, label){
         ()=>toast("Opening " + label + "…"),
         e=>toast("Couldn't launch " + label + " (" + e.name + ")"));
     }catch(err){ toast("Launch error: " + err.message); }
-  }else{
-    toast(label + ": would launch on the TV (no tizen API in this preview)");
+    return;
   }
+  launchViaService(appId, label);
 }
 function activate(){
   const t = CONFIG.tiles[idx];
