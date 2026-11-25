@@ -59,6 +59,15 @@
       } catch (e) { return send(res, 500, { error: String(e) }); }
     }
 
+    // return to the TV's native home screen by exiting the launcher app
+    if (req.method === 'POST' && path === '/api/home') {
+      send(res, 200, { ok: true });
+      setTimeout(function () {
+        try { tizen.application.getCurrentApplication().exit(); } catch (e) {}
+      }, 150); // let the HTTP response flush before we exit
+      return;
+    }
+
     // launch a native app by id
     if (req.method === 'POST' && path === '/api/launch') {
       return readBody(req).then(function (b) {
