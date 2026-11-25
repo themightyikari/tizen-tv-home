@@ -91,18 +91,15 @@ const CONFIG = {
     lat: 40.71, lon: -74.01,// <-- change to your coordinates
     unit: "fahrenheit"      // "fahrenheit" or "celsius"
   },
-  // Each tile finds its REAL app ID on the TV by matching `match` keywords against
-  // the installed-app list (from the service's /api/apps) - this auto-fixes the
-  // per-TV / per-region ID differences that break hard-coded IDs (e.g. Netflix).
-  // `fallback` is only used in the browser preview or if no match is found.
+  // Exact app IDs read and verified from THIS TV's installed-app list.
   tiles: [
-    { label:"Disney+",     emoji:"🏰", match:["disney"],         fallback:"3201901017640" },
-    { label:"Netflix",     emoji:"🔴", match:["netflix"],        fallback:"11101200001" },
-    { label:"Peacock",     emoji:"🦚", match:["peacock"],        fallback:"3202011022131" },
-    { label:"Max",         emoji:"🎬", match:["hbo","max"],      fallback:"3201601007230" },
-    { label:"Paramount+",  emoji:"⛰️", match:["paramount"],      fallback:"3201710015037" },
-    { label:"Prime Video", emoji:"📦", match:["prime","amazon"], fallback:"3201910019365" },
-    { label:"Hulu",        emoji:"🟢", match:["hulu"],           fallback:"3201601007625" },
+    { label:"Disney+",     emoji:"🏰", app:"MCmYXNxgcu.DisneyPlus" },
+    { label:"Netflix",     emoji:"🔴", app:"org.tizen.netflix-app" },
+    { label:"Peacock",     emoji:"🦚", app:"gzcc4LRFBF.Peacock" },
+    { label:"Max",         emoji:"🎬", app:"5b8c3eb16b.BeamCTVDev" },
+    { label:"Paramount+",  emoji:"⛰️", app:"rJyOSqC6Up.CBSAllAccess" },
+    { label:"Prime Video", emoji:"📦", app:"org.tizen.primevideo" },
+    { label:"Hulu",        emoji:"🟢", app:"LBUAQX1exg.Hulu" },
   ],
   columns: 3
 };
@@ -264,10 +261,8 @@ document.addEventListener("keydown", e=>{
     case 10009: /* Tizen BACK */ e.preventDefault(); break;
   }
 });
-// render tiles immediately with fallback IDs, then refine from the TV's apps
-CONFIG.tiles.forEach(t => { t.app = t.fallback; t.installed = true; });
+// tiles already carry verified, exact app IDs for this TV
 buildTiles();
-resolveApps();
 </script>
 </body>
 </html>
