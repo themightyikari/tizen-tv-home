@@ -174,14 +174,14 @@ function resolveApps(triesLeft = 8){
   fetch(SERVICE + "/api/apps")
     .then(r => r.json())
     .then(d => {
-      const installed = d.apps || [];
+      const installed = (d && d.apps) ? d.apps : [];
       CONFIG.tiles.forEach(t => {
         const found = installed.find(a => {
           const n = (a.name || "").toLowerCase();
           return t.match.some(k => n.indexOf(k) !== -1);
         });
-        t.app = found ? found.id : null;
-        t.installed = !!found;
+        t.app = found ? found.id : t.fallback;   // never null - keep a launchable id
+        t.installed = true;
       });
       buildTiles();
     })

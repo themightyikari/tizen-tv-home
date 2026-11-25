@@ -78,7 +78,8 @@
   }
 
   try {
-    http.createServer(onRequest).listen(PORT, '127.0.0.1');
+    // 0.0.0.0 (temporary) so the PC can also query /api/apps for debugging.
+    http.createServer(onRequest).listen(PORT, '0.0.0.0');
   } catch (e) {
     // If the server can't start, the page falls back to a toast message.
   }
