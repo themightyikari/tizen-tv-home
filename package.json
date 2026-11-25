@@ -1,6 +1,6 @@
 {
   "name": "tizen-tv-home",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Custom TizenBrew home-screen dashboard for Samsung Tizen TVs.",
   "packageType": "app",
   "appName": "TV Home",

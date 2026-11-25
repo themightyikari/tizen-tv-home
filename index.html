@@ -38,7 +38,7 @@
   .date{font-size:2vw; color:var(--muted); margin-top:1vh; letter-spacing:1px;}
 
   /* ---- tiles ---- */
-  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1.6vw; margin-top:3vh;}
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:1.8vw; margin-top:3vh;}
   .tile{
     background:var(--tile); border:2px solid var(--tile-border); border-radius:var(--radius);
     padding:2vh 1vw; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -47,6 +47,7 @@
   }
   .tile .emoji{font-size:3.4vw; line-height:1;}
   .tile .label{font-size:1.3vw; font-weight:600; color:var(--muted);}
+  .tile.unavailable{opacity:.4;}
   .tile.focused{
     transform:scale(1.09); background:#1b2440;
     border-color:var(--focus); box-shadow:0 0 0 4px rgba(91,140,255,.25), 0 18px 50px rgba(0,0,0,.5);
@@ -90,21 +91,19 @@ const CONFIG = {
     lat: 40.71, lon: -74.01,// <-- change to your coordinates
     unit: "fahrenheit"      // "fahrenheit" or "celsius"
   },
-  // Tiles. url = opens a web destination. native = shown as a note (launch from
-  // the remote or tvctl for now - native app launching from a web module is limited).
-  // app = native Tizen app ID (launched via tizen.application.launch on the TV).
-  // url = opens a web destination. Mix and match freely.
+  // Each tile finds its REAL app ID on the TV by matching `match` keywords against
+  // the installed-app list (from the service's /api/apps) - this auto-fixes the
+  // per-TV / per-region ID differences that break hard-coded IDs (e.g. Netflix).
+  // `fallback` is only used in the browser preview or if no match is found.
   tiles: [
-    { label:"YouTube",   emoji:"▶️", app:"111299001912" },
-    { label:"Netflix",   emoji:"🎬", app:"11101200001" },
-    { label:"Prime",     emoji:"📦", app:"3201910019365" },
-    { label:"Disney+",   emoji:"✨", app:"3201901017640" },
-    { label:"Spotify",   emoji:"🎵", app:"3201606009684" },
-    { label:"Plex",      emoji:"🟧", app:"3201512006963" },
-    { label:"TizenBrew", emoji:"🧩", app:"xvvl3S1bvH.TizenBrewStandalone" },
-    { label:"Browser",   emoji:"🌐", url:"https://www.google.com" },
+    { label:"Disney+",     emoji:"🏰", match:["disney"],         fallback:"3201901017640" },
+    { label:"Peacock",     emoji:"🦚", match:["peacock"],        fallback:"3202011022131" },
+    { label:"Max",         emoji:"🎬", match:["hbo","max"],      fallback:"3201601007230" },
+    { label:"Paramount+",  emoji:"⛰️", match:["paramount"],      fallback:"3201710015037" },
+    { label:"Prime Video", emoji:"📦", match:["prime","amazon"], fallback:"3201910019365" },
+    { label:"Hulu",        emoji:"🟢", match:["hulu"],           fallback:"3201601007625" },
   ],
-  columns: 4
+  columns: 3
 };
 /* ===================================================== */
 
@@ -150,14 +149,47 @@ loadWeather(); setInterval(loadWeather, 15*60*1000);
 /* ---- tiles + remote (D-pad) navigation ---- */
 const tilesEl = document.getElementById("tiles");
 let idx = 0;
-CONFIG.tiles.forEach((t,i)=>{
-  const el = document.createElement("div");
-  el.className = "tile"; el.tabIndex = 0;
-  el.innerHTML = `<div class="emoji">${t.emoji}</div><div class="label">${t.label}</div>`;
-  el.addEventListener("click", ()=>{ idx=i; focusTile(); activate(); });
-  tilesEl.appendChild(el);
-});
-const tileEls = [...document.querySelectorAll(".tile")];
+let tileEls = [];
+
+function buildTiles(){
+  tilesEl.innerHTML = "";
+  CONFIG.tiles.forEach((t,i)=>{
+    const el = document.createElement("div");
+    el.className = "tile" + (t.installed === false ? " unavailable" : "");
+    el.tabIndex = 0;
+    el.innerHTML = `<div class="emoji">${t.emoji}</div><div class="label">${t.label}</div>`;
+    el.addEventListener("click", ()=>{ idx=i; focusTile(); activate(); });
+    tilesEl.appendChild(el);
+  });
+  tileEls = [...document.querySelectorAll(".tile")];
+  if(idx >= tileEls.length) idx = 0;
+  focusTile();
+}
+
+// Ask the TizenBrew service which apps are installed, then map each tile to the
+// real app ID by name. Retries while the service is still booting; falls back to
+// fixed IDs in the browser preview (where there is no service).
+function resolveApps(triesLeft = 8){
+  fetch(SERVICE + "/api/apps")
+    .then(r => r.json())
+    .then(d => {
+      const installed = d.apps || [];
+      CONFIG.tiles.forEach(t => {
+        const found = installed.find(a => {
+          const n = (a.name || "").toLowerCase();
+          return t.match.some(k => n.indexOf(k) !== -1);
+        });
+        t.app = found ? found.id : null;
+        t.installed = !!found;
+      });
+      buildTiles();
+    })
+    .catch(() => {
+      if(triesLeft > 0){ setTimeout(() => resolveApps(triesLeft - 1), 500); return; }
+      CONFIG.tiles.forEach(t => { t.app = t.fallback; t.installed = true; });
+      buildTiles();
+    });
+}
 
 function focusTile(){
   tileEls.forEach(e=>e.classList.remove("focused"));
@@ -209,7 +241,7 @@ function activate(){
   const t = CONFIG.tiles[idx];
   if(t.url){ window.location.href = t.url; }
   else if(t.app){ launchNative(t.app, t.label); }
-  else { toast(t.label); }
+  else { toast(t.label + " isn't installed on this TV"); }
 }
 
 const COLS = CONFIG.columns;
@@ -231,7 +263,10 @@ document.addEventListener("keydown", e=>{
     case 10009: /* Tizen BACK */ e.preventDefault(); break;
   }
 });
-focusTile();
+// render tiles immediately with fallback IDs, then refine from the TV's apps
+CONFIG.tiles.forEach(t => { t.app = t.fallback; t.installed = true; });
+buildTiles();
+resolveApps();
 </script>
 </body>
 </html>
