@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TV Home</title>
+<style>
+  /* ---- THEME (edit these to re-skin the whole dashboard) ---- */
+  :root{
+    --bg1:#0b1020; --bg2:#070a14; --glow:#3b82f6;
+    --text:#f3f6ff; --muted:#8b96b4;
+    --tile:#141b30; --tile-border:#273356;
+    --focus:#5b8cff; --radius:22px;
+    --safe-x:5vw; --safe-y:4vh;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text); overflow:hidden;
+    background:radial-gradient(130vw 90vh at 75% -10%, #16203e 0%, var(--bg1) 45%, var(--bg2) 100%);
+  }
+  .wrap{height:100%; padding:var(--safe-y) var(--safe-x); display:flex; flex-direction:column;}
+
+  /* ---- top bar ---- */
+  header{display:flex; justify-content:space-between; align-items:flex-start;}
+  .greeting{font-size:2.4vw; font-weight:600; letter-spacing:.3px;}
+  .greeting small{display:block; color:var(--muted); font-size:1.2vw; font-weight:500; margin-top:.3vh;}
+  .weather{text-align:right; font-size:1.6vw; color:var(--muted); min-height:2vw;}
+  .weather .temp{font-size:2.4vw; color:var(--text); font-weight:600;}
+  .weather .ico{font-size:2.6vw; vertical-align:middle;}
+
+  /* ---- clock ---- */
+  .clockwrap{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;}
+  .clock{font-size:15vw; font-weight:700; line-height:.95; letter-spacing:-.5vw;
+         text-shadow:0 0 60px rgba(91,140,255,.35);}
+  .clock .sec{font-size:4vw; color:var(--muted); vertical-align:top; margin-left:.4vw; letter-spacing:0;}
+  .date{font-size:2vw; color:var(--muted); margin-top:1vh; letter-spacing:1px;}
+
+  /* ---- tiles ---- */
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1.6vw; margin-top:3vh;}
+  .tile{
+    background:var(--tile); border:2px solid var(--tile-border); border-radius:var(--radius);
+    padding:2vh 1vw; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:1vh; cursor:pointer; outline:none;
+    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .tile .emoji{font-size:3.4vw; line-height:1;}
+  .tile .label{font-size:1.3vw; font-weight:600; color:var(--muted);}
+  .tile.focused{
+    transform:scale(1.09); background:#1b2440;
+    border-color:var(--focus); box-shadow:0 0 0 4px rgba(91,140,255,.25), 0 18px 50px rgba(0,0,0,.5);
+  }
+  .tile.focused .label{color:var(--text);}
+
+  /* ---- toast ---- */
+  #toast{
+    position:fixed; left:50%; bottom:8vh; transform:translateX(-50%) translateY(20px);
+    background:rgba(10,14,26,.95); border:1px solid var(--tile-border); color:var(--text);
+    padding:1.4vh 2vw; border-radius:16px; font-size:1.4vw; opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; box-shadow:0 12px 40px rgba(0,0,0,.5);
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="greeting" id="greeting">Hello<small id="hello-sub">Welcome home</small></div>
+    <div class="weather" id="weather">&nbsp;</div>
+  </header>
+
+  <div class="clockwrap">
+    <div class="clock"><span id="hhmm">--:--</span><span class="sec" id="sec">00</span></div>
+    <div class="date" id="date">&nbsp;</div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ================== CONFIG (edit me) ================== */
+const CONFIG = {
+  name: "",                 // put your name for a personal greeting, e.g. "Alex"
+  clock24h: false,          // true = 24-hour clock
+  weather: {
+    city: "New York",       // <-- change to your city label
+    lat: 40.71, lon: -74.01,// <-- change to your coordinates
+    unit: "fahrenheit"      // "fahrenheit" or "celsius"
+  },
+  // Tiles. url = opens a web destination. native = shown as a note (launch from
+  // the remote or tvctl for now - native app launching from a web module is limited).
+  // app = native Tizen app ID (launched via tizen.application.launch on the TV).
+  // url = opens a web destination. Mix and match freely.
+  tiles: [
+    { label:"YouTube",   emoji:"▶️", app:"111299001912" },
+    { label:"Netflix",   emoji:"🎬", app:"11101200001" },
+    { label:"Prime",     emoji:"📦", app:"3201910019365" },
+    { label:"Disney+",   emoji:"✨", app:"3201901017640" },
+    { label:"Spotify",   emoji:"🎵", app:"3201606009684" },
+    { label:"Plex",      emoji:"🟧", app:"3201512006963" },
+    { label:"TizenBrew", emoji:"🧩", app:"xvvl3S1bvH.TizenBrewStandalone" },
+    { label:"Browser",   emoji:"🌐", url:"https://www.google.com" },
+  ],
+  columns: 4
+};
+/* ===================================================== */
+
+const pad = n => String(n).padStart(2,"0");
+
+function tickClock(){
+  const now = new Date();
+  let h = now.getHours();
+  const m = pad(now.getMinutes());
+  const s = pad(now.getSeconds());
+  if(!CONFIG.clock24h){ h = h % 12 || 12; }
+  document.getElementById("hhmm").textContent = (CONFIG.clock24h ? pad(h) : h) + ":" + m;
+  document.getElementById("sec").textContent = s;
+  document.getElementById("date").textContent =
+    now.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric"});
+  const hr = now.getHours();
+  const part = hr<12 ? "Good morning" : hr<18 ? "Good afternoon" : "Good evening";
+  document.getElementById("greeting").childNodes[0].nodeValue =
+    CONFIG.name ? part + ", " + CONFIG.name : part;
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ---- weather (Open-Meteo, no API key) ---- */
+const WCODE = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",
+  61:"🌦️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️",96:"⛈️",99:"⛈️"};
+async function loadWeather(){
+  const w = CONFIG.weather;
+  try{
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}`
+            + `&current=temperature_2m,weather_code&temperature_unit=${w.unit}&timezone=auto`;
+    const r = await fetch(u); const d = await r.json();
+    const t = Math.round(d.current.temperature_2m);
+    const ico = WCODE[d.current.weather_code] || "🌡️";
+    const deg = w.unit === "celsius" ? "°C" : "°F";
+    document.getElementById("weather").innerHTML =
+      `<span class="ico">${ico}</span> <span class="temp">${t}${deg}</span><br>${w.city}`;
+  }catch(e){
+    document.getElementById("weather").innerHTML = `<br>${w.city}`;
+  }
+}
+loadWeather(); setInterval(loadWeather, 15*60*1000);
+
+/* ---- tiles + remote (D-pad) navigation ---- */
+const tilesEl = document.getElementById("tiles");
+let idx = 0;
+CONFIG.tiles.forEach((t,i)=>{
+  const el = document.createElement("div");
+  el.className = "tile"; el.tabIndex = 0;
+  el.innerHTML = `<div class="emoji">${t.emoji}</div><div class="label">${t.label}</div>`;
+  el.addEventListener("click", ()=>{ idx=i; focusTile(); activate(); });
+  tilesEl.appendChild(el);
+});
+const tileEls = [...document.querySelectorAll(".tile")];
+
+function focusTile(){
+  tileEls.forEach(e=>e.classList.remove("focused"));
+  const el = tileEls[idx]; if(el){ el.classList.add("focused"); el.focus(); }
+}
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+// Native launching works inside TizenBrew on the TV (tizen.application.launch).
+// In a plain browser (this preview) window.tizen is undefined, so we show a note.
+const HAS_TIZEN = typeof window.tizen !== "undefined" && !!window.tizen.application;
+function launchNative(appId, label){
+  if(HAS_TIZEN){
+    try{
+      window.tizen.application.launch(appId,
+        ()=>toast("Opening " + label + "…"),
+        e=>toast("Couldn't launch " + label + " (" + e.name + ")"));
+    }catch(err){ toast("Launch error: " + err.message); }
+  }else{
+    toast(label + ": would launch on the TV (no tizen API in this preview)");
+  }
+}
+function activate(){
+  const t = CONFIG.tiles[idx];
+  if(t.url){ window.location.href = t.url; }
+  else if(t.app){ launchNative(t.app, t.label); }
+  else { toast(t.label); }
+}
+
+const COLS = CONFIG.columns;
+function move(d){
+  const n = tileEls.length;
+  if(d==="left")  idx = (idx - 1 + n) % n;
+  if(d==="right") idx = (idx + 1) % n;
+  if(d==="up")    idx = (idx - COLS + n) % n;
+  if(d==="down")  idx = (idx + COLS) % n;
+  focusTile();
+}
+document.addEventListener("keydown", e=>{
+  switch(e.keyCode){
+    case 37: move("left");  e.preventDefault(); break;
+    case 39: move("right"); e.preventDefault(); break;
+    case 38: move("up");    e.preventDefault(); break;
+    case 40: move("down");  e.preventDefault(); break;
+    case 13: activate();    e.preventDefault(); break; // Enter / OK
+    case 10009: /* Tizen BACK */ e.preventDefault(); break;
+  }
+});
+focusTile();
+</script>
+</body>
+</html>
