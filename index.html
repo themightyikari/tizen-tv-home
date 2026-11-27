@@ -60,37 +60,11 @@
   /* ---- living layer (fish, turtle, crab, jellyfish, bubbles) ---- */
   #life{position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none;}
 
-  /* animated sprite plumbing (GPU transforms only) */
-  .swimmer{position:absolute; left:0; will-change:transform;}
+  /* #life is now a <canvas>; fish/jellies/bubbles are drawn on it by the JS engine. */
+  /* sprite plumbing kept for the DOM plant layer (animated anemone + bubble columns) */
   .fit{display:block; transform-origin:center;}
   .sprite{position:relative; overflow:hidden;}
   .sprite > *{position:absolute; top:0; left:0;}
-
-  /* gentle body-sway layer: adds life on top of the sprite frames so motion
-     reads less stiff. Amplitude per-creature via --bobr (rotate) / --boby (lift). */
-  .bob{display:block; will-change:transform;}
-  @keyframes bob{
-    from{transform:translateY(calc(var(--boby,0.5vh) * -1)) rotate(calc(var(--bobr,2.4deg) * -1));}
-    to  {transform:translateY(var(--boby,0.5vh)) rotate(var(--bobr,2.4deg));}}
-  /* travel paths are generated per-creature in JS (cross, then hold off-screen) */
-
-  /* drifting jellyfish paths (gentle) */
-  .jelly{position:absolute; left:0; top:0; will-change:transform;}
-  @keyframes driftJelly{
-    0%{transform:translate3d(7vw,40vh,0);} 50%{transform:translate3d(13vw,11vh,0);}
-    100%{transform:translate3d(7vw,40vh,0);}}
-  @keyframes driftJelly2{
-    0%{transform:translate3d(82vw,18vh,0);} 50%{transform:translate3d(72vw,50vh,0);}
-    100%{transform:translate3d(82vw,18vh,0);}}
-
-  /* bubbles (artist PNG) */
-  .bubble{position:absolute; bottom:-6vh;
-    background:center/contain no-repeat url(bubble.png);
-    will-change:transform,opacity; opacity:0;}
-  @keyframes rise{
-    0%{transform:translateY(0) translateX(0); opacity:0;}
-    12%{opacity:.9;} 85%{opacity:.5;}
-    100%{transform:translateY(-112vh) translateX(var(--wx,2vw)); opacity:0;}}
 
   /* ---- foreground plants (coral + a living anemone), in front of fish ---- */
   #front{position:fixed; inset:0; z-index:-2; pointer-events:none; overflow:hidden;}
@@ -175,7 +149,7 @@
 <div id="godrays"></div>
 <div id="caustics"><div class="c a"></div><div class="c b"></div></div>
 <div id="kelp"></div>
-<div id="life"></div>
+<canvas id="life"></canvas>
 <div id="front"></div>
 <div id="scrim"></div>
 
@@ -269,29 +243,32 @@ async function loadWeather(){
 }
 loadWeather(); setInterval(loadWeather,15*60*1000);
 
-/* ================== aquarium life (v2 sprite sheets + atlases) ================== */
-/* Frame cycling uses GPU transforms only. Single-row strips translate one axis;
-   wide sheets ship as column×row atlases (nested translateX/Y) to stay under the
-   TV texture limit. Travel + depth scale + mirror are separate outer transforms. */
-
-const SWIMMERS=[
-  // hero fish (clownfish & angelfish use 6x2 atlases; others single-row strips).
-  // cf = fraction of the cycle spent crossing; the rest is spent off-screen, so the
-  // tank isn't crowded. Staggered delays spread out who is on screen at any moment.
-  {k:"clownfish", f:"fish_clownfish_atlas.png",    fw:360, fh:220, n:12, fps:9,  cols:6, rows:2, s:.80, top:20, dur:58,  cf:.42, dir:"R", delay:-6},
-  {k:"bluetang",  f:"fish_bluetang_strip.png",     fw:320, fh:200, n:12, fps:8,                   s:.78, top:44, dur:64,  cf:.44, dir:"L", delay:-30},
-  {k:"angelfish", f:"fish_angelfish_atlas.png",    fw:420, fh:300, n:12, fps:6,  cols:6, rows:2, s:.72, top:55, dur:88,  cf:.5,  dir:"R", delay:-52, br:"1.4deg", by:"0.35vh"},
-  {k:"yellowA",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.95, top:16, dur:46,  cf:.5,  dir:"R", delay:-4},
-  {k:"yellowB",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.62, top:24, dur:54,  cf:.5,  dir:"R", delay:-28},
-  {k:"school",    f:"school_atlas.png",            fw:360, fh:200, n:12, fps:10, cols:6, rows:2, s:.66, top:33, dur:76,  cf:.46, dir:"L", delay:-42},
-  {k:"turtle",    f:"turtle_atlas.png",            fw:520, fh:360, n:12, fps:6,  cols:6, rows:2, s:.60, top:60, dur:108, cf:.55, dir:"R", delay:-72, br:"0.8deg", by:"0.25vh"},
-  {k:"crab",      f:"crab_strip.png",              fw:180, fh:120, n:10, fps:8,                   s:.52, top:90, dur:118, cf:.55, dir:"R", delay:-20, br:"0.6deg", by:"0.12vh"},
-  {k:"shark",     f:"shark_silhouette_atlas.png",  fw:640, fh:260, n:12, fps:6,  cols:6, rows:2, s:.55, top:50, dur:132, cf:.5,  dir:"L", delay:-96, op:.42, br:"0.7deg", by:"0.18vh"},
-];
-const JELLIES=[
-  {k:"jellyA", f:"jellyfish_strip.png",       fw:260, fh:360, n:14, fps:6, s:.80, path:"driftJelly"},
-  {k:"jellyB", f:"jellyfish_small_strip.png", fw:170, fh:240, n:14, fps:6, s:.90, path:"driftJelly2"},
-];
+/* ================== aquarium life — Canvas-2D engine ==================
+   The fish, turtle, crab, shark, jellyfish and bubbles are now drawn on ONE <canvas>
+   (id="life") by a single rAF loop, instead of ~20 DOM sprite layers. Each creature
+   keeps the painterly sprite-sheet art but gains: a depth value (far = smaller, slower,
+   hazier), a gently curved swim path, mirror-by-heading, and a come-and-go lifecycle.
+   Config here; engine further down. Plants/anemone/bubble-columns stay in DOM. */
+const LIFE={
+  // f=sheet, fw/fh=frame, n=frames, fps, cols/rows=atlas (omit => single-row strip),
+  // s=base scale, band=[min,max] vertical zone (fraction of height), spd=px/s @1920w,
+  // dim=extra fog, rare=long gaps, pair=spawn two, flat=minimal vertical bob
+  fish:[
+    {f:"fish_clownfish_atlas.png",    fw:360,fh:220,n:12,fps:9,  cols:6,rows:2, s:.80, band:[.12,.40], spd:70},
+    {f:"fish_bluetang_strip.png",     fw:320,fh:200,n:12,fps:8,                 s:.78, band:[.34,.56], spd:62},
+    {f:"fish_angelfish_atlas.png",    fw:420,fh:300,n:12,fps:6,  cols:6,rows:2, s:.72, band:[.46,.66], spd:50},
+    {f:"fish_yellow_small_strip.png", fw:160,fh:110,n:12,fps:10,                s:.95, band:[.10,.34], spd:82, pair:true},
+    {f:"school_atlas.png",            fw:360,fh:200,n:12,fps:10, cols:6,rows:2, s:.66, band:[.24,.46], spd:66},
+    {f:"turtle_atlas.png",            fw:520,fh:360,n:12,fps:6,  cols:6,rows:2, s:.60, band:[.50,.70], spd:40},
+    {f:"crab_strip.png",              fw:180,fh:120,n:10,fps:8,                 s:.50, band:[.90,.92], spd:24, flat:true},
+    {f:"shark_silhouette_atlas.png",  fw:640,fh:260,n:12,fps:6,  cols:6,rows:2, s:.55, band:[.40,.60], spd:46, dim:.5, rare:true},
+  ],
+  jelly:[
+    {f:"jellyfish_strip.png",       fw:260,fh:360,n:14,fps:6, s:.80},
+    {f:"jellyfish_small_strip.png", fw:170,fh:240,n:14,fps:6, s:.90},
+  ],
+  bubbleImg:"bubble.png",
+};
 const KELP=[
   {f:"kelp_1.png", left:"1.5vw", h:30, bottom:3, sway:"sway1", dur:7.5, delay:-1},
   {f:"kelp_2.png", left:"7vw",   h:35, bottom:2, sway:"sway2", dur:9,   delay:-4},
@@ -329,59 +306,78 @@ function frameCSS(id, c){
   return `<div class="cyc_${id}"></div>`;
 }
 
-/* per-creature travel keyframe: cross the tank, then HOLD off-screen for the rest of
-   the cycle so creatures come and go instead of all being on screen at once */
-function travelCSS(id, c){
-  const vis=(c.cf!=null?c.cf:0.5);
-  const mid=(vis*50).toFixed(1), end=(vis*100).toFixed(1);
-  if(c.dir==="L"){
-    _css+=`@keyframes tr_${id}{0%{transform:translate3d(140vw,0,0);}`
-       +`${mid}%{transform:translate3d(50vw,-1.3vh,0);}`
-       +`${end}%{transform:translate3d(-40vw,0,0);}`
-       +`100%{transform:translate3d(-40vw,0,0);}}`;
-  } else {
-    _css+=`@keyframes tr_${id}{0%{transform:translate3d(-40vw,0,0);}`
-       +`${mid}%{transform:translate3d(50vw,-1.3vh,0);}`
-       +`${end}%{transform:translate3d(140vw,0,0);}`
-       +`100%{transform:translate3d(140vw,0,0);}}`;
-  }
-  return "tr_"+id;
-}
+/* ---- Canvas-2D engine: one loop draws every creature with depth + curved paths ---- */
+const _imgs={};
+function gimg(src){ let im=_imgs[src]; if(!im){ im=new Image(); im.src=src; _imgs[src]=im; } return im; }
+const cv=document.getElementById("life"), cx=cv.getContext("2d");
+let CW=0, CH=0, CS=1;
+function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=w; CH=cv.height=h; CS=CW/1920; }
+window.addEventListener("resize",sizeLife);
+const rnd=(a,b)=>a+Math.random()*(b-a);
 
-function buildLife(){
-  const life=document.getElementById("life");
-  SWIMMERS.forEach(a=>{
-    const inner=frameCSS(a.k, a);
-    const trk=travelCSS(a.k, a);
-    const sw=document.createElement("div");
-    sw.className="swimmer"; sw.style.top=a.top+"vh"; if(a.op!=null) sw.style.opacity=a.op;
-    sw.style.animation=trk+" "+a.dur+"s linear "+a.delay+"s infinite";
-    const dir=(a.dir==="L"?-1:1);
-    const bstyle=(a.br?"--bobr:"+a.br+";":"")+(a.by?"--boby:"+a.by+";":"")
-      +"animation:bob "+(3+Math.random()*3).toFixed(2)+"s ease-in-out "+(-Math.random()*4).toFixed(2)+"s infinite alternate;";
-    sw.innerHTML='<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
-      +'<div class="bob" style="'+bstyle+'">'
-      +'<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'+inner+'</div>'
-      +'</div></div>';
-    life.appendChild(sw);
-  });
-  JELLIES.forEach(j=>{
-    const inner=frameCSS(j.k, j);
-    const el=document.createElement("div"); el.className="jelly";
-    el.style.animation=j.path+" "+(j.path==="driftJelly2"?36:30)+"s ease-in-out infinite";
-    el.innerHTML='<div class="fit" style="transform:scale('+j.s+');">'
-      +'<div class="sprite" style="width:'+j.fw+'px;height:'+j.fh+'px;">'+inner+'</div></div>';
-    life.appendChild(el);
-  });
-  // bubbles
-  for(let i=0;i<8;i++){
-    const b=document.createElement("div"); const sz=(10+Math.random()*26);
-    b.className="bubble"; b.style.width=sz+"px"; b.style.height=sz+"px";
-    b.style.left=(Math.random()*100)+"vw"; b.style.setProperty("--wx",((Math.random()*6-3))+"vw");
-    b.style.animation="rise "+(10+Math.random()*10)+"s linear "+(-Math.random()*18)+"s infinite";
-    life.appendChild(b);
-  }
-}
+function Fish(sp){ this.sp=sp; this.im=gimg(sp.f);
+  const now=performance.now()/1000; this.respawn(now);
+  if(Math.random()<.6) this.x=rnd(.06,.94)*CW;                 // begin mid-tank
+  else { this.state="wait"; this.waitUntil=now+rnd(1,16); } }  // begin off-screen, enter soon
+Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
+Fish.prototype.respawn=function(t){ const sp=this.sp;
+  this.depth=rnd(.3,1); this.dir=(Math.random()<.5?1:-1);
+  const b=sp.band||[.3,.7]; this.baseY=rnd(b[0],b[1])*CH;
+  this.ampY=(sp.flat?rnd(.002,.007):rnd(.015,.04))*CH; this.freqY=rnd(.15,.35); this.phaseY=rnd(0,6.28);
+  const hw=sp.fw*this.sc()*.5; this.x=(this.dir>0)?-hw-20:CW+hw+20; this.y=this.baseY;
+  this.t0=t; this.state="swim"; };
+Fish.prototype.step=function(t,dt){
+  if(this.state==="wait"){ if(t>=this.waitUntil) this.respawn(t); return; }
+  this.x+=this.sp.spd*(.5+.6*this.depth)*CS*this.dir*dt;
+  this.y=this.baseY+this.ampY*Math.sin(t*this.freqY+this.phaseY);
+  const hw=this.sp.fw*this.sc()*.6;
+  if((this.dir>0&&this.x>CW+hw)||(this.dir<0&&this.x<-hw)){
+    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?26:5, this.sp.rare?55:18); } };
+Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
+  const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
+  const fi=Math.floor((t-this.t0)*sp.fps)%sp.n;
+  let sx,sy; if(sp.cols){ sx=(fi%sp.cols)*sp.fw; sy=((fi/sp.cols)|0)*sp.fh; } else { sx=fi*sp.fw; sy=0; }
+  const scale=this.sc(), alpha=(.55+.45*this.depth)*(sp.dim||1);
+  const vy=this.ampY*this.freqY*Math.cos(t*this.freqY+this.phaseY), tilt=Math.atan2(vy,80)*.5*this.dir;
+  cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.rotate(tilt);
+  cx.scale(this.dir*scale, scale);
+  cx.drawImage(im, sx,sy, sp.fw,sp.fh, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+
+function Jelly(sp,i){ this.sp=sp; this.im=gimg(sp.f); this.depth=rnd(.55,.95);
+  this.oxf=(i===0?.18:.82); this.oyf=(i===0?.30:.34); this.axf=rnd(.03,.06); this.ayf=rnd(.12,.20);
+  this.fx=rnd(.03,.06); this.fy=rnd(.04,.07); this.px=rnd(0,6.28); this.py=rnd(0,6.28);
+  this.t0=performance.now()/1000-rnd(0,10); this.x=this.oxf*CW; this.y=this.oyf*CH; }
+Jelly.prototype.step=function(t,dt){ this.x=(this.oxf+this.axf*Math.sin(t*this.fx+this.px))*CW; this.y=(this.oyf+this.ayf*Math.sin(t*this.fy+this.py))*CH; };
+Jelly.prototype.draw=function(t){ const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
+  const fi=Math.floor((t-this.t0)*sp.fps)%sp.n, scale=sp.s*(.6+.5*this.depth)*CS, alpha=.6+.4*this.depth;
+  cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.scale(scale,scale);
+  cx.drawImage(im, fi*sp.fw,0, sp.fw,sp.fh, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+
+function Bubble(init){ this.reset(init); }
+Bubble.prototype.reset=function(init){ this.x=rnd(.05,.95)*CW; this.y=init?rnd(0,CH):CH+rnd(0,.08*CH);
+  this.r=rnd(5,15)*CS; this.vy=rnd(38,88)*CS; this.wob=rnd(8,22)*CS; this.fq=rnd(.5,1.4); this.ph=rnd(0,6.28); this.depth=rnd(.3,1); };
+Bubble.prototype.step=function(t,dt){ this.y-=this.vy*dt; this.x+=Math.sin(t*this.fq+this.ph)*this.wob*dt; if(this.y<-20) this.reset(false); };
+Bubble.prototype.draw=function(t){ const im=gimg(LIFE.bubbleImg), a=Math.max(0,Math.min(1,this.y/CH))*.6;
+  cx.save(); cx.globalAlpha=a;
+  if(im.complete&&im.naturalWidth) cx.drawImage(im, this.x-this.r, this.y-this.r, this.r*2, this.r*2);
+  else { cx.beginPath(); cx.arc(this.x,this.y,this.r,0,6.283); cx.strokeStyle="rgba(200,240,255,.5)"; cx.lineWidth=1; cx.stroke(); }
+  cx.restore(); };
+
+let _fish=[], _jelly=[], _bub=[], _last=0, _acc=0;
+function lifeLoop(ms){ requestAnimationFrame(lifeLoop);
+  const t=ms/1000; let dt=t-(_last||t); _last=t; if(dt>.08) dt=.08;
+  _acc+=dt; if(_acc<1/30) return; const d=_acc; _acc=0;             // ~30fps cap
+  for(const f of _fish) f.step(t,d); for(const j of _jelly) j.step(t,d); for(const b of _bub) b.step(t,d);
+  cx.clearRect(0,0,CW,CH);
+  const ds=[]; for(const f of _fish){ if(f.state==="swim") ds.push(f); } for(const j of _jelly) ds.push(j);
+  ds.sort((a,b)=>a.depth-b.depth);                                 // far first
+  for(const o of ds) o.draw(t);
+  for(const b of _bub) b.draw(t); }
+function buildLife(){ sizeLife();
+  LIFE.fish.forEach(sp=>{ _fish.push(new Fish(sp)); if(sp.pair) _fish.push(new Fish(sp)); });
+  LIFE.jelly.forEach((sp,i)=>_jelly.push(new Jelly(sp,i)));
+  for(let i=0;i<10;i++) _bub.push(new Bubble(true));
+  requestAnimationFrame(lifeLoop); }
 
 function buildPlants(){
   const kelp=document.getElementById("kelp");
