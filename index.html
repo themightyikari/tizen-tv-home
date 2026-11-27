@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TV Home</title>
 <style>
-  /* ============ AQUARIUM THEME (real art) ============ */
+  /* ============ AQUARIUM THEME v2 (real art, living water) ============ */
   :root{
     --text:#eafcff; --muted:#bfeaf7;
     --focus:#8ff0ff; --radius:22px;
@@ -23,35 +23,64 @@
     background:linear-gradient(to bottom, var(--w-top) 0%, var(--w-mid) 34%, var(--w-deep) 68%, var(--w-abyss) 100%);
   }
 
-  /* ---- painted reef background (artist PNG) ---- */
-  #bg{position:fixed; inset:0; z-index:-6;
+  /* ---- painted reef background (artist PNG, caustics toned down for live layer) ---- */
+  #bg{position:fixed; inset:0; z-index:-8;
     background:#072f49 url(reef_background.png) center center / cover no-repeat;}
 
-  /* ---- living layer (fish, jellyfish, bubbles) ---- */
+  /* ---- drifting volumetric god-rays (artist overlay, slow lateral pan) ---- */
+  #godrays{position:fixed; top:0; left:50%; width:133.34vw; height:100vh; margin-left:-66.67vw;
+    background:url(godrays_overlay.png) center center / 100% 100% no-repeat;
+    opacity:.14; z-index:-7; pointer-events:none; will-change:transform;
+    animation:grPan 46s ease-in-out infinite alternate;}
+  @keyframes grPan{from{transform:translate3d(-150px,0,0);} to{transform:translate3d(150px,0,0);}}
+
+  /* ---- living caustics: two seamless tiling layers panning behind the life ---- */
+  #caustics{position:fixed; left:0; right:0; top:34vh; bottom:0; z-index:-6;
+    pointer-events:none; overflow:hidden;}
+  #caustics .c{position:absolute; top:0; left:0;
+    width:calc(100% + 1024px); height:calc(100% + 1024px);
+    background-repeat:repeat; will-change:transform; mix-blend-mode:screen;}
+  #caustics .c.a{background-image:url(caustics_tile.png); background-size:1024px 1024px;
+    opacity:.24; animation:cpanA 62s linear infinite;}
+  #caustics .c.b{background-image:url(caustics_tile.png); background-size:1403px 1403px;
+    opacity:.13; animation:cpanB 94s linear infinite;}
+  @keyframes cpanA{from{transform:translate3d(0,0,0);} to{transform:translate3d(-1024px,-1024px,0);}}
+  @keyframes cpanB{from{transform:translate3d(0,0,0);} to{transform:translate3d(-1403px,-1403px,0);}}
+
+  /* ---- back plants (kelp, swaying), in front of water, behind fish ---- */
+  #kelp{position:fixed; inset:0; z-index:-5; pointer-events:none; overflow:hidden;}
+  #kelp img{position:absolute; width:auto; transform-origin:50% 100%; will-change:transform;}
+  @keyframes sway1{0%,100%{transform:rotate(-2deg);} 50%{transform:rotate(2deg);}}
+  @keyframes sway2{0%,100%{transform:rotate(1.6deg);} 50%{transform:rotate(-2.6deg);}}
+  @keyframes sway3{0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(2.6deg);}}
+
+  /* ---- living layer (fish, turtle, crab, jellyfish, bubbles) ---- */
   #life{position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none;}
 
-  /* animated sprite-sheet swimmers */
+  /* animated sprite plumbing (GPU transforms only) */
   .swimmer{position:absolute; left:0; will-change:transform;}
   .fit{display:block; transform-origin:center;}
-  .sprite{overflow:hidden;}
-  .strip{will-change:transform;}
+  .sprite{position:relative; overflow:hidden;}
+  .sprite > *{position:absolute; top:0; left:0;}
 
-  @keyframes swimR{from{transform:translateX(-32vw);}to{transform:translateX(132vw);}}
-  @keyframes swimL{from{transform:translateX(132vw);}to{transform:translateX(-32vw);}}
+  /* travel paths with a gentle vertical undulation */
+  @keyframes swimR{
+    0%{transform:translate3d(-34vw,0,0);} 25%{transform:translate3d(9vw,-1.2vh,0);}
+    50%{transform:translate3d(50vw,0,0);} 75%{transform:translate3d(91vw,1.2vh,0);}
+    100%{transform:translate3d(134vw,0,0);}}
+  @keyframes swimL{
+    0%{transform:translate3d(134vw,0,0);} 25%{transform:translate3d(91vw,1.2vh,0);}
+    50%{transform:translate3d(50vw,0,0);} 75%{transform:translate3d(9vw,-1.2vh,0);}
+    100%{transform:translate3d(-34vw,0,0);}}
 
-  /* per-creature frame cycling (FW*frames) */
-  @keyframes cyc-clownfish{from{transform:translateX(0);}to{transform:translateX(-2880px);}}
-  @keyframes cyc-bluetang {from{transform:translateX(0);}to{transform:translateX(-2560px);}}
-  @keyframes cyc-yellow   {from{transform:translateX(0);}to{transform:translateX(-1280px);}}
-  @keyframes cyc-angelfish{from{transform:translateX(0);}to{transform:translateX(-3360px);}}
-  @keyframes cyc-jelly    {from{transform:translateX(0);}to{transform:translateX(-2600px);}}
-
-  /* drifting jellyfish path (gentle, left side, rises & sinks) */
-  .jelly{position:absolute; left:0; top:0; will-change:transform; animation:driftJelly 30s ease-in-out infinite;}
+  /* drifting jellyfish paths (gentle) */
+  .jelly{position:absolute; left:0; top:0; will-change:transform;}
   @keyframes driftJelly{
-    0%  {transform:translate(7vw,40vh);}
-    50% {transform:translate(13vw,11vh);}
-    100%{transform:translate(7vw,40vh);}}
+    0%{transform:translate3d(7vw,40vh,0);} 50%{transform:translate3d(13vw,11vh,0);}
+    100%{transform:translate3d(7vw,40vh,0);}}
+  @keyframes driftJelly2{
+    0%{transform:translate3d(82vw,18vh,0);} 50%{transform:translate3d(72vw,50vh,0);}
+    100%{transform:translate3d(82vw,18vh,0);}}
 
   /* bubbles (artist PNG) */
   .bubble{position:absolute; bottom:-6vh;
@@ -59,32 +88,38 @@
     will-change:transform,opacity; opacity:0;}
   @keyframes rise{
     0%{transform:translateY(0) translateX(0); opacity:0;}
-    12%{opacity:.9;} 85%{opacity:.55;}
-    100%{transform:translateY(-110vh) translateX(var(--wx,2vw)); opacity:0;}}
+    12%{opacity:.9;} 85%{opacity:.5;}
+    100%{transform:translateY(-112vh) translateX(var(--wx,2vw)); opacity:0;}}
+
+  /* ---- foreground plants (coral + a living anemone), in front of fish ---- */
+  #front{position:fixed; inset:0; z-index:-2; pointer-events:none; overflow:hidden;}
+  #front img.coral{position:absolute; width:auto;}
+  .anem{position:absolute;}
+  .anem .fit{transform-origin:50% 100%;}
 
   /* ---- readability scrim (keeps white clock crisp) ---- */
   #scrim{position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(120vw 58vh at 50% 40%, rgba(0,0,0,0) 48%, rgba(2,18,34,.22) 100%),
-      linear-gradient(to bottom, rgba(2,20,36,.26) 0%, rgba(2,20,36,0) 26%, rgba(0,14,26,.30) 100%);}
+      radial-gradient(120vw 58vh at 50% 40%, rgba(0,0,0,0) 48%, rgba(2,18,34,.24) 100%),
+      linear-gradient(to bottom, rgba(2,20,36,.30) 0%, rgba(2,20,36,0) 24%, rgba(0,14,26,.32) 100%);}
 
   /* ---- layout ---- */
   .wrap{height:100%; padding:var(--safe-y) var(--safe-x); display:flex; flex-direction:column;}
   header{display:flex; justify-content:space-between; align-items:flex-start;}
   .greeting{font-size:2.4vw; font-weight:700; letter-spacing:.3px;
-    text-shadow:0 2px 16px rgba(0,30,55,.75);}
+    text-shadow:0 2px 16px rgba(0,30,55,.8);}
   .greeting small{display:block; color:var(--muted); font-size:1.15vw; font-weight:500; margin-top:.4vh;}
-  .weather{text-align:right; min-width:14vw; text-shadow:0 2px 16px rgba(0,30,55,.75);}
+  .weather{text-align:right; min-width:14vw; text-shadow:0 2px 16px rgba(0,30,55,.8);}
   .weather .w-main{display:flex; align-items:center; justify-content:flex-end; gap:.6vw;}
   .weather .w-ico{font-size:2.6vw;} .weather .w-temp{font-size:2.5vw; font-weight:700;}
   .weather .w-sub{font-size:1.15vw; color:var(--muted); margin-top:.2vh; font-weight:500;}
 
   .clockwrap{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;}
   .clock{font-size:13vw; font-weight:700; line-height:.95; letter-spacing:-.4vw;
-    text-shadow:0 0 54px rgba(120,230,255,.5), 0 4px 24px rgba(0,25,55,.7);}
+    text-shadow:0 0 54px rgba(120,230,255,.5), 0 4px 24px rgba(0,25,55,.75);}
   .clock .sec{font-size:3.4vw; color:var(--muted); vertical-align:top; margin-left:.4vw; letter-spacing:0;}
   .date{font-size:1.9vw; color:var(--muted); margin-top:.6vh; letter-spacing:1px; font-weight:600;
-    text-shadow:0 2px 14px rgba(0,25,55,.7);}
+    text-shadow:0 2px 14px rgba(0,25,55,.75);}
 
   /* ---- app portholes (artist brass-glass rings) ---- */
   .portholes{display:flex; justify-content:center; gap:1.3vw; margin-top:1.4vh; flex-wrap:nowrap;}
@@ -94,7 +129,6 @@
     display:flex; align-items:center; justify-content:center;
     transition:transform .16s ease, filter .16s ease;
   }
-  /* two stacked rings: resting + glowing, cross-faded on focus (both preloaded, no flash) */
   .port .glass::before, .port .glass::after{
     content:""; position:absolute; inset:0;
     background:center/contain no-repeat; transition:opacity .18s ease;}
@@ -103,7 +137,7 @@
   .port .emoji{position:relative; z-index:1; font-size:4.1vw; line-height:1;
     filter:drop-shadow(0 3px 7px rgba(0,0,0,.5));}
   .port .label{font-size:1.1vw; font-weight:600; color:var(--muted);
-    text-shadow:0 2px 10px rgba(0,22,45,.75);}
+    text-shadow:0 2px 10px rgba(0,22,45,.8);}
   .port.unavailable{opacity:.4;}
 
   /* ---- bottom nav pills ---- */
@@ -115,7 +149,7 @@
   .navbtn .emoji{font-size:1.6vw;} .navbtn .label{font-size:1.15vw; font-weight:600; color:var(--muted);}
 
   /* ---- focus states ---- */
-  .port.focused .glass{transform:scale(1.12); filter:drop-shadow(0 0 16px var(--accent, rgba(120,235,255,.8)));}
+  .port.focused .glass{transform:scale(1.12); filter:drop-shadow(0 0 16px var(--accent, rgba(120,235,255,.85)));}
   .port.focused .glass::after{opacity:1;}
   .port.focused .glass::before{opacity:0;}
   .port.focused .label{color:var(--text);}
@@ -135,9 +169,13 @@
 </head>
 <body>
 
-<!-- ===== Aquarium scene (artist PNG art) ===== -->
+<!-- ===== Aquarium scene (artist PNG art, v2 living water) ===== -->
 <div id="bg"></div>
+<div id="godrays"></div>
+<div id="caustics"><div class="c a"></div><div class="c b"></div></div>
+<div id="kelp"></div>
 <div id="life"></div>
+<div id="front"></div>
 <div id="scrim"></div>
 
 <div class="wrap">
@@ -230,59 +268,118 @@ async function loadWeather(){
 }
 loadWeather(); setInterval(loadWeather,15*60*1000);
 
-/* ================== aquarium life (real sprite sheets) ================== */
-/* Each fish: outer swimmer travels across screen; .fit scales for depth + mirrors for
-   left travel; .sprite is the frame window; .strip cycles frames (GPU transforms only). */
+/* ================== aquarium life (v2 sprite sheets + atlases) ================== */
+/* Frame cycling uses GPU transforms only. Single-row strips translate one axis;
+   wide sheets ship as column×row atlases (nested translateX/Y) to stay under the
+   TV texture limit. Travel + depth scale + mirror are separate outer transforms. */
+
 const SWIMMERS=[
-  // name,        strip file,                   fw,  fh,  frames, cycKey,      scale, top(vh), dur(s), dir, delay(s)
-  {k:"clownfish", f:"fish_clownfish_strip.png",  fw:360, fh:220, n:8,  cyc:"cyc-clownfish", cdur:1.0,   s:.80, top:20, dur:40, dir:"R", delay:-4},
-  {k:"bluetang",  f:"fish_bluetang_strip.png",   fw:320, fh:200, n:8,  cyc:"cyc-bluetang",  cdur:1.0,   s:.78, top:42, dur:48, dir:"L", delay:-22},
-  {k:"angelfish", f:"fish_angelfish_strip.png",  fw:420, fh:300, n:8,  cyc:"cyc-angelfish", cdur:1.333, s:.72, top:55, dur:58, dir:"R", delay:-12},
-  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.95, top:16, dur:30, dir:"R", delay:-3},
-  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.75, top:12, dur:33, dir:"R", delay:-9},
-  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.60, top:24, dur:36, dir:"R", delay:-16},
+  // hero fish (clownfish & angelfish use 6x2 atlases; others single-row strips)
+  {k:"clownfish", f:"fish_clownfish_atlas.png",    fw:360, fh:220, n:12, fps:9,  cols:6, rows:2, s:.80, top:20, dur:40, dir:"R", delay:-4},
+  {k:"bluetang",  f:"fish_bluetang_strip.png",     fw:320, fh:200, n:12, fps:8,                   s:.78, top:44, dur:48, dir:"L", delay:-22},
+  {k:"angelfish", f:"fish_angelfish_atlas.png",    fw:420, fh:300, n:12, fps:6,  cols:6, rows:2, s:.72, top:56, dur:60, dir:"R", delay:-12},
+  {k:"yellowA",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.95, top:15, dur:30, dir:"R", delay:-3},
+  {k:"yellowB",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.62, top:24, dur:37, dir:"R", delay:-15},
+  {k:"school",    f:"school_atlas.png",            fw:360, fh:200, n:12, fps:10, cols:6, rows:2, s:.66, top:33, dur:46, dir:"L", delay:-20},
+  {k:"turtle",    f:"turtle_atlas.png",            fw:520, fh:360, n:12, fps:6,  cols:6, rows:2, s:.60, top:60, dur:74, dir:"R", delay:-34},
+  {k:"crab",      f:"crab_strip.png",              fw:180, fh:120, n:10, fps:8,                   s:.52, top:90, dur:98, dir:"R", delay:-8},
 ];
+const JELLIES=[
+  {k:"jellyA", f:"jellyfish_strip.png",       fw:260, fh:360, n:14, fps:6, s:.80, path:"driftJelly"},
+  {k:"jellyB", f:"jellyfish_small_strip.png", fw:170, fh:240, n:14, fps:6, s:.90, path:"driftJelly2"},
+];
+const KELP=[
+  {f:"kelp_1.png", left:"1.5vw", h:30, bottom:3, sway:"sway1", dur:7.5, delay:-1},
+  {f:"kelp_2.png", left:"7vw",   h:35, bottom:2, sway:"sway2", dur:9,   delay:-4},
+  {f:"kelp_4.png", left:"88vw",  h:33, bottom:3, sway:"sway3", dur:8,   delay:-2},
+  {f:"kelp_3.png", left:"94vw",  h:29, bottom:2, sway:"sway1", dur:6.8, delay:-5},
+];
+const CORAL=[
+  {f:"coral_1.png", side:"left",  pos:"-1vw", h:17},
+  {f:"coral_3.png", side:"right", pos:"-1vw", h:18},
+  {f:"coral_2.png", side:"left",  pos:"64vw", h:12},
+];
+const ANEM={f:"anemone_atlas.png", fw:360, fh:300, n:12, fps:6, cols:6, rows:2, s:.5, leftvw:26, bottomvh:1};
+
+/* build the per-sprite frame-cycling CSS + inner HTML */
+let _css="";
+function frameCSS(id, c){
+  const cdur=(c.n/c.fps);
+  if(c.cols){
+    const W=c.fw*c.cols, H=c.fh*c.rows;
+    _css+=`@keyframes ay_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(0,-${H}px,0);}}`
+        +`@keyframes ax_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(-${W}px,0,0);}}`
+        +`.ay_${id}{width:${W}px;height:${H}px;animation:ay_${id} ${cdur}s steps(${c.rows}) infinite;}`
+        +`.ax_${id}{width:${W}px;height:${H}px;background:url(${c.f}) 0 0/100% 100% no-repeat;`
+        +`animation:ax_${id} ${cdur/c.rows}s steps(${c.cols}) infinite;}`;
+    return `<div class="ay_${id}"><div class="ax_${id}"></div></div>`;
+  }
+  const W=c.fw*c.n;
+  _css+=`@keyframes cyc_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(-${W}px,0,0);}}`
+      +`.cyc_${id}{width:${W}px;height:${c.fh}px;background:url(${c.f}) 0 0/100% 100% no-repeat;`
+      +`animation:cyc_${id} ${cdur}s steps(${c.n}) infinite;}`;
+  return `<div class="cyc_${id}"></div>`;
+}
+
 function buildLife(){
   const life=document.getElementById("life");
-
   SWIMMERS.forEach(a=>{
+    const inner=frameCSS(a.k, a);
     const sw=document.createElement("div");
-    sw.className="swimmer";
-    sw.style.top=a.top+"vh";
+    sw.className="swimmer"; sw.style.top=a.top+"vh";
     sw.style.animation=(a.dir==="L"?"swimL":"swimR")+" "+a.dur+"s linear "+a.delay+"s infinite";
     const dir=(a.dir==="L"?-1:1);
-    sw.innerHTML=
-      '<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
-      + '<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'
-      +   '<div class="strip" style="width:'+(a.fw*a.n)+'px;height:'+a.fh+'px;'
-      +     'background:url('+a.f+') 0 0/100% 100% no-repeat;'
-      +     'animation:'+a.cyc+' '+a.cdur+'s steps('+a.n+') infinite;"></div>'
-      + '</div></div>';
+    sw.innerHTML='<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
+      +'<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'+inner+'</div></div>';
     life.appendChild(sw);
   });
-
-  // drifting jellyfish (bell pulse = sprite cycle)
-  const jf={fw:260, fh:360, n:10, cdur:1.667};
-  const j=document.createElement("div"); j.className="jelly";
-  j.innerHTML=
-    '<div class="fit" style="transform:scale(.8);">'
-    + '<div class="sprite" style="width:'+jf.fw+'px;height:'+jf.fh+'px;">'
-    +   '<div class="strip" style="width:'+(jf.fw*jf.n)+'px;height:'+jf.fh+'px;'
-    +     'background:url(jellyfish_strip.png) 0 0/100% 100% no-repeat;'
-    +     'animation:cyc-jelly '+jf.cdur+'s steps('+jf.n+') infinite;"></div>'
-    + '</div></div>';
-  life.appendChild(j);
-
+  JELLIES.forEach(j=>{
+    const inner=frameCSS(j.k, j);
+    const el=document.createElement("div"); el.className="jelly";
+    el.style.animation=j.path+" "+(j.path==="driftJelly2"?36:30)+"s ease-in-out infinite";
+    el.innerHTML='<div class="fit" style="transform:scale('+j.s+');">'
+      +'<div class="sprite" style="width:'+j.fw+'px;height:'+j.fh+'px;">'+inner+'</div></div>';
+    life.appendChild(el);
+  });
   // bubbles
   for(let i=0;i<13;i++){
-    const b=document.createElement("div"); const sz=(10+Math.random()*26); // px
+    const b=document.createElement("div"); const sz=(10+Math.random()*26);
     b.className="bubble"; b.style.width=sz+"px"; b.style.height=sz+"px";
     b.style.left=(Math.random()*100)+"vw"; b.style.setProperty("--wx",((Math.random()*6-3))+"vw");
     b.style.animation="rise "+(10+Math.random()*10)+"s linear "+(-Math.random()*18)+"s infinite";
     life.appendChild(b);
   }
 }
+
+function buildPlants(){
+  const kelp=document.getElementById("kelp");
+  KELP.forEach(k=>{
+    const img=document.createElement("img"); img.src=k.f; img.alt="";
+    img.style.left=k.left; img.style.bottom=k.bottom+"vh"; img.style.height=k.h+"vh";
+    img.style.animation=k.sway+" "+k.dur+"s ease-in-out "+k.delay+"s infinite";
+    kelp.appendChild(img);
+  });
+  const front=document.getElementById("front");
+  CORAL.forEach(c=>{
+    const img=document.createElement("img"); img.src=c.f; img.alt=""; img.className="coral";
+    img.style.bottom="0"; img.style.height=c.h+"vh";
+    if(c.side==="right") img.style.right=c.pos; else img.style.left=c.pos;
+    front.appendChild(img);
+  });
+  // living anemone (animated atlas, anchored on the sand)
+  const inner=frameCSS("anem", ANEM);
+  const an=document.createElement("div"); an.className="anem";
+  an.style.left=ANEM.leftvw+"vw"; an.style.bottom=ANEM.bottomvh+"vh";
+  an.style.width=ANEM.fw+"px"; an.style.height=ANEM.fh+"px"; an.style.marginLeft=(-ANEM.fw/2)+"px";
+  an.innerHTML='<div class="fit" style="transform:scale('+ANEM.s+');">'
+    +'<div class="sprite" style="width:'+ANEM.fw+'px;height:'+ANEM.fh+'px;">'+inner+'</div></div>';
+  front.appendChild(an);
+}
+
 buildLife();
+buildPlants();
+// inject all generated sprite keyframes/classes once
+const st=document.createElement("style"); st.textContent=_css; document.head.appendChild(st);
 
 /* ================== launcher / remote nav ================== */
 const SERVICE="http://127.0.0.1:8099";
@@ -372,7 +469,6 @@ build();
   bgm.volume=0.45;
   const start=()=>{ const p=bgm.play(); if(p&&p.catch) p.catch(()=>{}); };
   start(); // best-effort autoplay on load (TV may block until a gesture)
-  // guaranteed start on the first remote keypress / click (user gesture unlocks audio)
   const kick=()=>{ start();
     window.removeEventListener("keydown",kick,true);
     window.removeEventListener("click",kick,true); };
