@@ -258,7 +258,7 @@ const LIFE={
     {f:"fish_bluetang_strip.png",     fw:320,fh:200,n:12,fps:8,                 s:.78, band:[.34,.56], spd:62},
     {f:"fish_angelfish_atlas.png",    fw:420,fh:300,n:12,fps:6,  cols:6,rows:2, s:.72, band:[.46,.66], spd:50},
     {f:"fish_yellow_small_strip.png", fw:160,fh:110,n:12,fps:10,                s:.95, band:[.10,.34], spd:82, pair:true},
-    {f:"school_atlas.png",            fw:360,fh:200,n:12,fps:10, cols:6,rows:2, s:.66, band:[.24,.46], spd:66},
+    {f:"school_atlas.png",            fw:360,fh:200,n:12,fps:10, cols:6,rows:2, s:.66, band:[.24,.46], spd:66, skip:5},  // frame 5 has an un-cleaned white patch (art bug); skip it until the sheet is re-delivered
     {f:"turtle_atlas.png",            fw:520,fh:360,n:12,fps:6,  cols:6,rows:2, s:.60, band:[.50,.70], spd:40},
     {f:"crab_strip.png",              fw:180,fh:120,n:10,fps:8,                 s:.50, band:[.90,.92], spd:24, flat:true},
     {f:"shark_silhouette_atlas.png",  fw:640,fh:260,n:12,fps:6,  cols:6,rows:2, s:.55, band:[.40,.60], spd:46, dim:.5, rare:true},
@@ -336,13 +336,14 @@ Fish.prototype.step=function(t,dt){
     this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?26:5, this.sp.rare?55:18); } };
 Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
   const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
-  const fi=Math.floor((t-this.t0)*sp.fps)%sp.n;
+  const N=sp.n-(sp.skip!=null?1:0); let fi=Math.floor((t-this.t0)*sp.fps)%N; if(sp.skip!=null&&fi>=sp.skip) fi++;
   let sx,sy; if(sp.cols){ sx=(fi%sp.cols)*sp.fw; sy=((fi/sp.cols)|0)*sp.fh; } else { sx=fi*sp.fw; sy=0; }
   const scale=this.sc(), alpha=(.55+.45*this.depth)*(sp.dim||1);
   const vy=this.ampY*this.freqY*Math.cos(t*this.freqY+this.phaseY), tilt=Math.atan2(vy,80)*.5*this.dir;
   cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.rotate(tilt);
   cx.scale(this.dir*scale, scale);
-  cx.drawImage(im, sx,sy, sp.fw,sp.fh, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+  // inset the source rect by 0.5px so bilinear sampling can't bleed the neighbouring atlas frame
+  cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
 
 function Jelly(sp,i){ this.sp=sp; this.im=gimg(sp.f); this.depth=rnd(.55,.95);
   this.oxf=(i===0?.18:.82); this.oyf=(i===0?.30:.34); this.axf=rnd(.03,.06); this.ayf=rnd(.12,.20);
@@ -352,7 +353,7 @@ Jelly.prototype.step=function(t,dt){ this.x=(this.oxf+this.axf*Math.sin(t*this.f
 Jelly.prototype.draw=function(t){ const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
   const fi=Math.floor((t-this.t0)*sp.fps)%sp.n, scale=sp.s*(.6+.5*this.depth)*CS, alpha=.6+.4*this.depth;
   cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.scale(scale,scale);
-  cx.drawImage(im, fi*sp.fw,0, sp.fw,sp.fh, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+  cx.drawImage(im, fi*sp.fw+0.5,0.5, sp.fw-1,sp.fh-1, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
 
 function Bubble(init){ this.reset(init); }
 Bubble.prototype.reset=function(init){ this.x=rnd(.05,.95)*CW; this.y=init?rnd(0,CH):CH+rnd(0,.08*CH);
