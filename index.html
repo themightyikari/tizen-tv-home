@@ -157,6 +157,9 @@
 
 <div id="toast"></div>
 
+<!-- ambient background music (loops) -->
+<audio id="bgm" src="aquarium_loop.mp3" loop preload="auto"></audio>
+
 <script>
 /* ================== CONFIG ================== */
 const CONFIG = {
@@ -361,6 +364,21 @@ document.addEventListener("keydown",e=>{
   }
 });
 build();
+
+/* ================== ambient music loop ================== */
+(function(){
+  const bgm=document.getElementById("bgm");
+  if(!bgm) return;
+  bgm.volume=0.45;
+  const start=()=>{ const p=bgm.play(); if(p&&p.catch) p.catch(()=>{}); };
+  start(); // best-effort autoplay on load (TV may block until a gesture)
+  // guaranteed start on the first remote keypress / click (user gesture unlocks audio)
+  const kick=()=>{ start();
+    window.removeEventListener("keydown",kick,true);
+    window.removeEventListener("click",kick,true); };
+  window.addEventListener("keydown",kick,true);
+  window.addEventListener("click",kick,true);
+})();
 </script>
 </body>
 </html>
