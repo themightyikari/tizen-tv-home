@@ -263,7 +263,7 @@ const LIFE={
   // all padded (>=8% clear alpha on every side), school white-patch fixed. Dims/fps/atlas
   // from animation_manifest_v3.json. s tuned to hold ~the same on-screen size as v2.
   fish:[
-    {f:"fish_clownfish_atlas.png",    fw:292,fh:180,n:18,fps:13.5, cols:6,rows:3, s:.99,  band:[.12,.40], spd:70},
+    {f:"fish_clownfish_atlas.png",    fw:360,fh:220,n:12,fps:9,    cols:6,rows:2, s:.80,  band:[.12,.40], spd:70},  // reverted to smooth v2 cycle (v3's 18 poses pitched inconsistently -> fluttery)
     {f:"fish_bluetang_atlas.png",     fw:260,fh:164,n:18,fps:12,   cols:6,rows:3, s:.96,  band:[.34,.56], spd:62},
     {f:"fish_angelfish_atlas.png",    fw:342,fh:244,n:18,fps:9,    cols:6,rows:3, s:.88,  band:[.46,.66], spd:50},
     {f:"fish_yellow_small_strip.png", fw:130,fh:90, n:18,fps:15,                  s:1.15, band:[.10,.34], spd:82, pair:true},
@@ -332,6 +332,8 @@ function Fish(sp){ this.sp=sp; this.im=gimg(sp.f);
 Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
 Fish.prototype.respawn=function(t){ const sp=this.sp;
   this.depth=rnd(.3,1); this.dir=(Math.random()<.5?1:-1);
+  // per-individual colour variation so repeats of a species never look identical ("clipart")
+  this.hue=rnd(-16,16); this.bri=(.9+rnd(0,.2)).toFixed(3); this.sat=(.86+rnd(0,.28)).toFixed(3);
   const b=sp.band||[.3,.7]; this.baseY=rnd(b[0],b[1])*CH;
   this.ampY=(sp.flat?rnd(.002,.007):rnd(.015,.04))*CH; this.freqY=rnd(.15,.35); this.phaseY=rnd(0,6.28);
   const hw=sp.fw*this.sc()*.5; this.x=(this.dir>0)?-hw-20:CW+hw+20; this.y=this.baseY;
@@ -349,7 +351,9 @@ Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
   let sx,sy; if(sp.cols){ sx=(fi%sp.cols)*sp.fw; sy=((fi/sp.cols)|0)*sp.fh; } else { sx=fi*sp.fw; sy=0; }
   const scale=this.sc(), alpha=(.55+.45*this.depth)*(sp.dim||1);
   const vy=this.ampY*this.freqY*Math.cos(t*this.freqY+this.phaseY), tilt=Math.atan2(vy,80)*.5*this.dir;
-  cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.rotate(tilt);
+  cx.save(); cx.globalAlpha=alpha;
+  cx.filter="hue-rotate("+this.hue+"deg) brightness("+this.bri+") saturate("+this.sat+")";
+  cx.translate(this.x,this.y); cx.rotate(tilt);
   cx.scale(this.dir*scale, scale);
   // inset the source rect by 0.5px so bilinear sampling can't bleed the neighbouring atlas frame
   cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
