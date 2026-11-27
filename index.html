@@ -283,6 +283,7 @@ const SWIMMERS=[
   {k:"school",    f:"school_atlas.png",            fw:360, fh:200, n:12, fps:10, cols:6, rows:2, s:.66, top:33, dur:46, dir:"L", delay:-20},
   {k:"turtle",    f:"turtle_atlas.png",            fw:520, fh:360, n:12, fps:6,  cols:6, rows:2, s:.60, top:60, dur:74, dir:"R", delay:-34},
   {k:"crab",      f:"crab_strip.png",              fw:180, fh:120, n:10, fps:8,                   s:.52, top:90, dur:98, dir:"R", delay:-8},
+  {k:"shark",     f:"shark_silhouette_atlas.png",  fw:640, fh:260, n:12, fps:6,  cols:6, rows:2, s:.55, top:50, dur:96, dir:"L", delay:-50, op:.45},
 ];
 const JELLIES=[
   {k:"jellyA", f:"jellyfish_strip.png",       fw:260, fh:360, n:14, fps:6, s:.80, path:"driftJelly"},
@@ -300,6 +301,10 @@ const CORAL=[
   {f:"coral_2.png", side:"left",  pos:"64vw", h:12},
 ];
 const ANEM={f:"anemone_atlas.png", fw:360, fh:300, n:12, fps:6, cols:6, rows:2, s:.5, leftvw:26, bottomvh:1};
+const BUBBLECOL=[
+  {f:"bubble_column_strip.png", fw:96, fh:256, n:16, fps:6, leftvw:11, bottomvh:1, s:.95},
+  {f:"bubble_column_strip.png", fw:96, fh:256, n:16, fps:6, leftvw:85, bottomvh:1, s:.7},
+];
 
 /* build the per-sprite frame-cycling CSS + inner HTML */
 let _css="";
@@ -326,7 +331,7 @@ function buildLife(){
   SWIMMERS.forEach(a=>{
     const inner=frameCSS(a.k, a);
     const sw=document.createElement("div");
-    sw.className="swimmer"; sw.style.top=a.top+"vh";
+    sw.className="swimmer"; sw.style.top=a.top+"vh"; if(a.op!=null) sw.style.opacity=a.op;
     sw.style.animation=(a.dir==="L"?"swimL":"swimR")+" "+a.dur+"s linear "+a.delay+"s infinite";
     const dir=(a.dir==="L"?-1:1);
     sw.innerHTML='<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
@@ -374,6 +379,16 @@ function buildPlants(){
   an.innerHTML='<div class="fit" style="transform:scale('+ANEM.s+');">'
     +'<div class="sprite" style="width:'+ANEM.fw+'px;height:'+ANEM.fh+'px;">'+inner+'</div></div>';
   front.appendChild(an);
+  // rising bubble columns (by the coral)
+  BUBBLECOL.forEach((bc,i)=>{
+    const inner=frameCSS("bcol"+i, bc);
+    const el=document.createElement("div"); el.className="anem";
+    el.style.left=bc.leftvw+"vw"; el.style.bottom=bc.bottomvh+"vh";
+    el.style.width=bc.fw+"px"; el.style.height=bc.fh+"px"; el.style.marginLeft=(-bc.fw/2)+"px";
+    el.innerHTML='<div class="fit" style="transform:scale('+bc.s+');">'
+      +'<div class="sprite" style="width:'+bc.fw+'px;height:'+bc.fh+'px;">'+inner+'</div></div>';
+    front.appendChild(el);
+  });
 }
 
 buildLife();
