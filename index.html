@@ -250,31 +250,45 @@ async function loadWeather(){
 loadWeather(); setInterval(loadWeather,15*60*1000);
 
 /* ================== aquarium life — Canvas-2D engine ==================
-   The fish, turtle, crab, shark, jellyfish and bubbles are now drawn on ONE <canvas>
-   (id="life") by a single rAF loop, instead of ~20 DOM sprite layers. Each creature
-   keeps the painterly sprite-sheet art but gains: a depth value (far = smaller, slower,
-   hazier), a gently curved swim path, mirror-by-heading, and a come-and-go lifecycle.
+   Every creature is drawn on ONE <canvas> (id="life") by a single rAF loop. Each gains:
+   a depth value (far = smaller, slower, hazier), a gently curved swim path, per-instance
+   colour, a come-and-go lifecycle, and — new in v4 — a real BANKING TURN: instead of an
+   instant mirror-flip, a fish plays a right->left turn sheet once to reverse heading.
    Config here; engine further down. Plants/anemone/bubble-columns stay in DOM. */
 const LIFE={
-  // f=sheet, fw/fh=frame, n=frames, fps, cols/rows=atlas (omit => single-row strip),
-  // s=base scale, band=[min,max] vertical zone (fraction of height), spd=px/s @1920w,
-  // dim=extra fog, rare=long gaps, pair=spawn two, flat=minimal vertical bob
-  // v3 (2026-11-27): 6 actors re-rendered to 18 real articulated frames (6x3 atlases),
-  // all padded (>=8% clear alpha on every side), school white-patch fixed. Dims/fps/atlas
-  // from animation_manifest_v3.json. s tuned to hold ~the same on-screen size as v2.
+  // v4 "believable reef" (2026-11-27): whole cast re-rendered — supersampled then downsampled
+  // to delivery for crisp detail — with genuine banking TURN sheets. Specs straight from
+  // animation_manifest_v4.json. Per creature: fw/fh = frame; anchorY = body anchor (keeps the
+  // axis steady across swim<->turn); swim{} + tn{} each = atlas {file, n frames, fps, cols}
+  // (row-major, rows = ceil(n/cols)). s tuned to hold ~the v1.11 on-screen sizes the owner liked.
+  // band=[min,max] vertical zone (frac of height); spd=px/s @1920w; turn=chance a crossing
+  // U-turns mid-tank (shows the banking art, keeps the fish in view); count=spawn N (shoal);
+  // flat=minimal bob; dim=extra fog; rare=long off-screen gaps.
+  // MEMORY: resident cast ~56MB decoded (swim+turn for all, +jelly pulse; hero idles skipped —
+  // the engine has no in-view hover). If the TV runs low (reloads/flashes), drop a species line.
+  // Retired here: school (-> real reef_schooler shoal), yellow_small, shark_silhouette, jelly_small.
   fish:[
-    {f:"fish_clownfish_atlas.png",    fw:360,fh:220,n:12,fps:9,    cols:6,rows:2, s:.80,  band:[.12,.40], spd:70},  // reverted to smooth v2 cycle (v3's 18 poses pitched inconsistently -> fluttery)
-    {f:"fish_bluetang_atlas.png",     fw:260,fh:164,n:18,fps:12,   cols:6,rows:3, s:.96,  band:[.34,.56], spd:62},
-    {f:"fish_angelfish_atlas.png",    fw:342,fh:244,n:18,fps:9,    cols:6,rows:3, s:.88,  band:[.46,.66], spd:50},
-    {f:"fish_yellow_small_strip.png", fw:130,fh:90, n:18,fps:15,                  s:1.15, band:[.10,.34], spd:82, pair:true},
-    {f:"school_atlas.png",            fw:294,fh:162,n:18,fps:15,   cols:6,rows:3, s:.81,  band:[.24,.46], spd:66},
-    {f:"turtle_atlas.png",            fw:424,fh:294,n:18,fps:9,    cols:6,rows:3, s:.74,  band:[.50,.70], spd:40},
-    {f:"crab_strip.png",              fw:180,fh:120,n:10,fps:8,                   s:.55,  band:[.90,.92], spd:24, flat:true},
-    {f:"shark_silhouette_atlas.png",  fw:640,fh:260,n:12,fps:6,    cols:6,rows:2, s:.56,  band:[.40,.60], spd:46, dim:.5, rare:true},
+    {k:"clownfish",     fw:264,fh:168, anchorY:.481, s:1.09, band:[.12,.40], spd:68, turn:.50,
+      swim:{f:"v4_clownfish_swim.png",     n:24,fps:16,cols:4}, tn:{f:"v4_clownfish_turn.png",     n:12,fps:10,cols:3}},
+    {k:"bluetang",      fw:264,fh:168, anchorY:.520, s:.95,  band:[.30,.52], spd:60, turn:.50,
+      swim:{f:"v4_bluetang_swim.png",      n:22,fps:14,cols:2}, tn:{f:"v4_bluetang_turn.png",      n:12,fps:10,cols:3}},
+    {k:"angelfish",     fw:256,fh:232, anchorY:.495, s:1.18, band:[.42,.62], spd:48, turn:.45,
+      swim:{f:"v4_angelfish_swim.png",     n:20,fps:8, cols:4}, tn:{f:"v4_angelfish_turn.png",     n:12,fps:10,cols:3}},
+    {k:"turtle",        fw:352,fh:236, anchorY:.375, s:.89,  band:[.50,.70], spd:38, turn:.35,
+      swim:{f:"v4_turtle_swim.png",        n:20,fps:6, cols:4}, tn:{f:"v4_turtle_turn.png",        n:12,fps:10,cols:3}},
+    {k:"reef_schooler", fw:104,fh:72,  anchorY:.468, s:.85,  band:[.18,.42], spd:78, turn:.50, count:6,
+      swim:{f:"v4_reef_schooler_swim.png", n:18,fps:15,cols:3}, tn:{f:"v4_reef_schooler_turn.png", n:12,fps:12,cols:3}},
+    {k:"crab",          fw:144,fh:96,  anchorY:.374, s:.69,  band:[.885,.915], spd:22, turn:.40, flat:true,
+      swim:{f:"v4_crab_swim.png",          n:12,fps:8, cols:3}, tn:{f:"v4_crab_turn.png",          n:14,fps:12,cols:2}},
+    {k:"reef_shark",    fw:384,fh:160, anchorY:.536, s:.93,  band:[.40,.62], spd:46, turn:.25, dim:.6, rare:true,
+      swim:{f:"v4_reef_shark_swim.png",    n:16,fps:6, cols:2}, tn:{f:"v4_reef_shark_turn.png",    n:12,fps:10,cols:2}},
+    {k:"eagle_ray",     fw:320,fh:200, anchorY:.446, s:1.19, band:[.28,.52], spd:40, turn:.30, rare:true,
+      swim:{f:"v4_eagle_ray_swim.png",     n:18,fps:6, cols:3}, tn:{f:"v4_eagle_ray_turn.png",     n:12,fps:10,cols:3}},
   ],
+  // both jellies share ONE pulse texture (loaded once); the second is a smaller cool-tinted alias
   jelly:[
-    {f:"jellyfish_strip.png",       fw:260,fh:360,n:14,fps:6, s:.80},
-    {f:"jellyfish_small_strip.png", fw:170,fh:240,n:14,fps:6, s:.90},
+    {f:"v4_jellyfish_pulse.png", fw:192,fh:272, n:16,fps:6, cols:4, anchorY:.297, s:1.08},
+    {f:"v4_jellyfish_pulse.png", fw:192,fh:272, n:16,fps:6, cols:4, anchorY:.297, s:.70, tint:-22},
   ],
   bubbleImg:"bubble.png",
 };
@@ -325,10 +339,10 @@ function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080
 window.addEventListener("resize",sizeLife);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 
-function Fish(sp){ this.sp=sp; this.im=gimg(sp.f);
+function Fish(sp){ this.sp=sp; this.im=gimg(sp.swim.f); this.imT=sp.tn?gimg(sp.tn.f):null;
   const now=performance.now()/1000; this.respawn(now);
-  if(Math.random()<.5) this.x=rnd(.06,.94)*CW;                 // begin mid-tank
-  else { this.state="wait"; this.waitUntil=now+rnd(1,16); } }  // begin off-screen, enter soon
+  if(Math.random()<.5){ this.x=rnd(.10,.90)*CW; this.turned=true; }  // begin mid-tank (no turn this crossing)
+  else { this.state="wait"; this.waitUntil=now+rnd(1,16); } }        // begin off-screen, enter soon
 Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
 Fish.prototype.respawn=function(t){ const sp=this.sp;
   this.depth0=rnd(.3,1); this.depth=this.depth0; this.dir=(Math.random()<.5?1:-1);
@@ -340,44 +354,69 @@ Fish.prototype.respawn=function(t){ const sp=this.sp;
   this.spdMul=rnd(.80,1.18); this.pulseF=rnd(1.4,2.4); this.pulseP=rnd(0,6.28);
   this.vDrift=(sp.flat?0:rnd(-6,6))*CS; this.ddF=rnd(.05,.12); this.ddP=rnd(0,6.28);
   const hw=sp.fw*this.sc()*.5; this.x=(this.dir>0)?-hw-20:CW+hw+20; this.y=this.baseY;
-  this.t0=t; this.state="swim"; };
+  this.t0=t; this.state="swim";
+  // banking U-turn: does THIS crossing reverse mid-tank (once) to show the turn art & linger?
+  this.turned=false; this.willTurn=!!sp.tn && Math.random()<(sp.turn||0); this.turnAtX=rnd(.34,.66)*CW; };
+Fish.prototype.enterTurn=function(t){ this.state="turn"; this.turnT0=t; this.turned=true;
+  this.turnDur=this.sp.tn.n/this.sp.tn.fps; };
 Fish.prototype.step=function(t,dt){
   if(this.state==="wait"){ if(t>=this.waitUntil) this.respawn(t); return; }
   // slow depth drift -> live scale / haze / speed breathe (nearer & farther mid-path)
   this.depth=Math.max(.25,Math.min(1,this.depth0+.07*Math.sin(t*this.ddF+this.ddP)));
+  if(this.state==="turn"){
+    // bank in place: coast to near-stop through the reversal, keep a gentle vertical bob
+    const p=Math.min(1,(t-this.turnT0)/this.turnDur);
+    this.x+=this.sp.spd*this.spdMul*(1-p)*.35*(.5+.6*this.depth)*CS*this.dir*dt;
+    this.y=this.baseY+this.ampY*Math.sin(t*this.freqY+this.phaseY);
+    if(p>=1){ this.dir=-this.dir; this.state="swim"; this.t0=t; }   // resume mirrored swim0 the other way
+    return;
+  }
   // surge/glide: speed pulses with the tail beat, times this fish's own pace
   const surge=1+.15*Math.sin(t*this.pulseF+this.pulseP);
   this.x+=this.sp.spd*this.spdMul*surge*(.5+.6*this.depth)*CS*this.dir*dt;
   // gentle vertical drift so paths angle instead of running dead flat (clamped to the band)
   this.baseY=Math.max(this.band[0]*CH,Math.min(this.band[1]*CH,this.baseY+this.vDrift*dt));
   this.y=this.baseY+this.ampY*Math.sin(t*this.freqY+this.phaseY);
+  // mid-tank U-turn when the fish crosses its turn point (needs the turn sheet decoded; else just cross)
+  if(this.willTurn&&!this.turned&&this.imT&&this.imT.complete&&this.imT.naturalWidth&&
+     ((this.dir>0&&this.x>=this.turnAtX)||(this.dir<0&&this.x<=this.turnAtX))){ this.enterTurn(t); return; }
   const hw=this.sp.fw*this.sc()*.6;
   if((this.dir>0&&this.x>CW+hw)||(this.dir<0&&this.x<-hw)){
     this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?30:9, this.sp.rare?64:24); } };
-Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
-  const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
-  const N=sp.n-(sp.skip!=null?1:0); let fi=Math.floor((t-this.t0)*sp.fps)%N; if(sp.skip!=null&&fi>=sp.skip) fi++;
-  let sx,sy; if(sp.cols){ sx=(fi%sp.cols)*sp.fw; sy=((fi/sp.cols)|0)*sp.fh; } else { sx=fi*sp.fw; sy=0; }
+Fish.prototype.draw=function(t){ if(this.state==="wait") return;
+  const sp=this.sp; let im,N,fps,cols,fi;
+  if(this.state==="turn"){ im=this.imT; N=sp.tn.n; fps=sp.tn.fps; cols=sp.tn.cols;
+    fi=Math.min(N-1,Math.floor((t-this.turnT0)*fps)); }        // turn: play once 0..N-1 (right->left profile)
+  else { im=this.im; N=sp.swim.n; fps=sp.swim.fps; cols=sp.swim.cols; fi=Math.floor((t-this.t0)*fps)%N; }
+  if(!im||!im.complete||!im.naturalWidth) return;
+  const sx=(fi%cols)*sp.fw, sy=((fi/cols)|0)*sp.fh;
   const scale=this.sc(), alpha=(.55+.45*this.depth)*(sp.dim||1);
   const vy=this.ampY*this.freqY*Math.cos(t*this.freqY+this.phaseY), tilt=Math.atan2(vy,80)*.5*this.dir;
   cx.save(); cx.globalAlpha=alpha;
   // depth haze: far creatures lose saturation + dim a touch (atmospheric perspective) so they sit INSIDE the water, not on top
   const hz=.60+.40*this.depth, dz=.86+.14*this.depth;
   cx.filter="hue-rotate("+this.hue+"deg) brightness("+(this.bri*dz).toFixed(3)+") saturate("+(this.sat*hz).toFixed(3)+")";
-  cx.translate(this.x,this.y); cx.rotate(tilt);
+  cx.translate(this.x,this.y);
+  if(this.state!=="turn") cx.rotate(tilt);                     // swim: slight pitch; turn: the art does the banking
+  // during a turn, mirror by the PRE-turn heading (dir): heading-right plays the sheet as drawn
+  // (banks right->left); heading-left plays it mirrored (banks left->right). dir flips when the turn ends.
   cx.scale(this.dir*scale, scale);
-  // inset the source rect by 0.5px so bilinear sampling can't bleed the neighbouring atlas frame
-  cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+  const oy=-(sp.anchorY!=null?sp.anchorY:.5)*sp.fh;           // honour the body anchor (steady axis across sheets)
+  // inset the source rect by 0.5px so bilinear sampling can't bleed the neighbouring atlas cell
+  cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,oy, sp.fw,sp.fh); cx.restore(); };
 
 function Jelly(sp,i){ this.sp=sp; this.im=gimg(sp.f); this.depth=rnd(.55,.95);
-  this.oxf=(i===0?.18:.82); this.oyf=(i===0?.30:.34); this.axf=rnd(.03,.06); this.ayf=rnd(.12,.20);
+  this.oxf=(i===0?.18:.82); this.oyf=(i===0?.26:.30); this.axf=rnd(.03,.06); this.ayf=rnd(.10,.18);
   this.fx=rnd(.03,.06); this.fy=rnd(.04,.07); this.px=rnd(0,6.28); this.py=rnd(0,6.28);
   this.t0=performance.now()/1000-rnd(0,10); this.x=this.oxf*CW; this.y=this.oyf*CH; }
 Jelly.prototype.step=function(t,dt){ this.x=(this.oxf+this.axf*Math.sin(t*this.fx+this.px))*CW; this.y=(this.oyf+this.ayf*Math.sin(t*this.fy+this.py))*CH; };
 Jelly.prototype.draw=function(t){ const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
   const fi=Math.floor((t-this.t0)*sp.fps)%sp.n, scale=sp.s*(.6+.5*this.depth)*CS, alpha=.6+.4*this.depth;
-  cx.save(); cx.globalAlpha=alpha; cx.translate(this.x,this.y); cx.scale(scale,scale);
-  cx.drawImage(im, fi*sp.fw+0.5,0.5, sp.fw-1,sp.fh-1, -sp.fw/2,-sp.fh/2, sp.fw,sp.fh); cx.restore(); };
+  const cols=sp.cols||1, sx=(fi%cols)*sp.fw, sy=((fi/cols)|0)*sp.fh, oy=-(sp.anchorY!=null?sp.anchorY:.5)*sp.fh;
+  cx.save(); cx.globalAlpha=alpha;
+  if(sp.tint) cx.filter="hue-rotate("+sp.tint+"deg) saturate(1.1) brightness(1.03)";  // cool-tinted small alias
+  cx.translate(this.x,this.y); cx.scale(scale,scale);
+  cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,oy, sp.fw,sp.fh); cx.restore(); };
 
 function Bubble(init){ this.reset(init); }
 Bubble.prototype.reset=function(init){ this.x=rnd(.05,.95)*CW; this.y=init?rnd(0,CH):CH+rnd(0,.08*CH);
@@ -395,12 +434,12 @@ function lifeLoop(ms){ requestAnimationFrame(lifeLoop);
   _acc+=dt; if(_acc<1/30) return; const d=_acc; _acc=0;             // ~30fps cap
   for(const f of _fish) f.step(t,d); for(const j of _jelly) j.step(t,d); for(const b of _bub) b.step(t,d);
   cx.clearRect(0,0,CW,CH);
-  const ds=[]; for(const f of _fish){ if(f.state==="swim") ds.push(f); } for(const j of _jelly) ds.push(j);
+  const ds=[]; for(const f of _fish){ if(f.state!=="wait") ds.push(f); } for(const j of _jelly) ds.push(j);
   ds.sort((a,b)=>a.depth-b.depth);                                 // far first
   for(const o of ds) o.draw(t);
   for(const b of _bub) b.draw(t); }
 function buildLife(){ sizeLife();
-  LIFE.fish.forEach(sp=>{ _fish.push(new Fish(sp)); if(sp.pair) _fish.push(new Fish(sp)); });
+  LIFE.fish.forEach(sp=>{ const c=sp.count||1; for(let i=0;i<c;i++) _fish.push(new Fish(sp)); });  // count>1 => loose shoal
   LIFE.jelly.forEach((sp,i)=>_jelly.push(new Jelly(sp,i)));
   for(let i=0;i<10;i++) _bub.push(new Bubble(true));
   requestAnimationFrame(lifeLoop); }
