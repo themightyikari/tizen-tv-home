@@ -34,16 +34,19 @@
     animation:grPan 46s ease-in-out infinite alternate;}
   @keyframes grPan{from{transform:translate3d(-150px,0,0);} to{transform:translate3d(150px,0,0);}}
 
-  /* ---- living caustics: two seamless tiling layers panning behind the life ---- */
-  #caustics{position:fixed; left:0; right:0; top:34vh; bottom:0; z-index:-6;
-    pointer-events:none; overflow:hidden;}
+  /* ---- living caustics: two seamless tiling layers, concentrated low on the sand,
+         softly faded toward the top (no hard edge), no blend mode (perf) ---- */
+  #caustics{position:fixed; left:0; right:0; top:62vh; bottom:0; z-index:-6;
+    pointer-events:none; overflow:hidden;
+    -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,0) 46%);
+            mask-image:linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,0) 46%);}
   #caustics .c{position:absolute; top:0; left:0;
     width:calc(100% + 1024px); height:calc(100% + 1024px);
-    background-repeat:repeat; will-change:transform; mix-blend-mode:screen;}
+    background-repeat:repeat; will-change:transform;}
   #caustics .c.a{background-image:url(caustics_tile.png); background-size:1024px 1024px;
-    opacity:.24; animation:cpanA 62s linear infinite;}
+    opacity:.36; animation:cpanA 62s linear infinite;}
   #caustics .c.b{background-image:url(caustics_tile.png); background-size:1403px 1403px;
-    opacity:.13; animation:cpanB 94s linear infinite;}
+    opacity:.20; animation:cpanB 94s linear infinite;}
   @keyframes cpanA{from{transform:translate3d(0,0,0);} to{transform:translate3d(-1024px,-1024px,0);}}
   @keyframes cpanB{from{transform:translate3d(0,0,0);} to{transform:translate3d(-1403px,-1403px,0);}}
 
@@ -63,15 +66,13 @@
   .sprite{position:relative; overflow:hidden;}
   .sprite > *{position:absolute; top:0; left:0;}
 
-  /* travel paths with a gentle vertical undulation */
-  @keyframes swimR{
-    0%{transform:translate3d(-34vw,0,0);} 25%{transform:translate3d(9vw,-1.2vh,0);}
-    50%{transform:translate3d(50vw,0,0);} 75%{transform:translate3d(91vw,1.2vh,0);}
-    100%{transform:translate3d(134vw,0,0);}}
-  @keyframes swimL{
-    0%{transform:translate3d(134vw,0,0);} 25%{transform:translate3d(91vw,1.2vh,0);}
-    50%{transform:translate3d(50vw,0,0);} 75%{transform:translate3d(9vw,-1.2vh,0);}
-    100%{transform:translate3d(-34vw,0,0);}}
+  /* gentle body-sway layer: adds life on top of the sprite frames so motion
+     reads less stiff. Amplitude per-creature via --bobr (rotate) / --boby (lift). */
+  .bob{display:block; will-change:transform;}
+  @keyframes bob{
+    from{transform:translateY(calc(var(--boby,0.5vh) * -1)) rotate(calc(var(--bobr,2.4deg) * -1));}
+    to  {transform:translateY(var(--boby,0.5vh)) rotate(var(--bobr,2.4deg));}}
+  /* travel paths are generated per-creature in JS (cross, then hold off-screen) */
 
   /* drifting jellyfish paths (gentle) */
   .jelly{position:absolute; left:0; top:0; will-change:transform;}
@@ -274,16 +275,18 @@ loadWeather(); setInterval(loadWeather,15*60*1000);
    TV texture limit. Travel + depth scale + mirror are separate outer transforms. */
 
 const SWIMMERS=[
-  // hero fish (clownfish & angelfish use 6x2 atlases; others single-row strips)
-  {k:"clownfish", f:"fish_clownfish_atlas.png",    fw:360, fh:220, n:12, fps:9,  cols:6, rows:2, s:.80, top:20, dur:40, dir:"R", delay:-4},
-  {k:"bluetang",  f:"fish_bluetang_strip.png",     fw:320, fh:200, n:12, fps:8,                   s:.78, top:44, dur:48, dir:"L", delay:-22},
-  {k:"angelfish", f:"fish_angelfish_atlas.png",    fw:420, fh:300, n:12, fps:6,  cols:6, rows:2, s:.72, top:56, dur:60, dir:"R", delay:-12},
-  {k:"yellowA",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.95, top:15, dur:30, dir:"R", delay:-3},
-  {k:"yellowB",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.62, top:24, dur:37, dir:"R", delay:-15},
-  {k:"school",    f:"school_atlas.png",            fw:360, fh:200, n:12, fps:10, cols:6, rows:2, s:.66, top:33, dur:46, dir:"L", delay:-20},
-  {k:"turtle",    f:"turtle_atlas.png",            fw:520, fh:360, n:12, fps:6,  cols:6, rows:2, s:.60, top:60, dur:74, dir:"R", delay:-34},
-  {k:"crab",      f:"crab_strip.png",              fw:180, fh:120, n:10, fps:8,                   s:.52, top:90, dur:98, dir:"R", delay:-8},
-  {k:"shark",     f:"shark_silhouette_atlas.png",  fw:640, fh:260, n:12, fps:6,  cols:6, rows:2, s:.55, top:50, dur:96, dir:"L", delay:-50, op:.45},
+  // hero fish (clownfish & angelfish use 6x2 atlases; others single-row strips).
+  // cf = fraction of the cycle spent crossing; the rest is spent off-screen, so the
+  // tank isn't crowded. Staggered delays spread out who is on screen at any moment.
+  {k:"clownfish", f:"fish_clownfish_atlas.png",    fw:360, fh:220, n:12, fps:9,  cols:6, rows:2, s:.80, top:20, dur:58,  cf:.42, dir:"R", delay:-6},
+  {k:"bluetang",  f:"fish_bluetang_strip.png",     fw:320, fh:200, n:12, fps:8,                   s:.78, top:44, dur:64,  cf:.44, dir:"L", delay:-30},
+  {k:"angelfish", f:"fish_angelfish_atlas.png",    fw:420, fh:300, n:12, fps:6,  cols:6, rows:2, s:.72, top:55, dur:88,  cf:.5,  dir:"R", delay:-52, br:"1.4deg", by:"0.35vh"},
+  {k:"yellowA",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.95, top:16, dur:46,  cf:.5,  dir:"R", delay:-4},
+  {k:"yellowB",   f:"fish_yellow_small_strip.png", fw:160, fh:110, n:12, fps:10,                  s:.62, top:24, dur:54,  cf:.5,  dir:"R", delay:-28},
+  {k:"school",    f:"school_atlas.png",            fw:360, fh:200, n:12, fps:10, cols:6, rows:2, s:.66, top:33, dur:76,  cf:.46, dir:"L", delay:-42},
+  {k:"turtle",    f:"turtle_atlas.png",            fw:520, fh:360, n:12, fps:6,  cols:6, rows:2, s:.60, top:60, dur:108, cf:.55, dir:"R", delay:-72, br:"0.8deg", by:"0.25vh"},
+  {k:"crab",      f:"crab_strip.png",              fw:180, fh:120, n:10, fps:8,                   s:.52, top:90, dur:118, cf:.55, dir:"R", delay:-20, br:"0.6deg", by:"0.12vh"},
+  {k:"shark",     f:"shark_silhouette_atlas.png",  fw:640, fh:260, n:12, fps:6,  cols:6, rows:2, s:.55, top:50, dur:132, cf:.5,  dir:"L", delay:-96, op:.42, br:"0.7deg", by:"0.18vh"},
 ];
 const JELLIES=[
   {k:"jellyA", f:"jellyfish_strip.png",       fw:260, fh:360, n:14, fps:6, s:.80, path:"driftJelly"},
@@ -326,16 +329,40 @@ function frameCSS(id, c){
   return `<div class="cyc_${id}"></div>`;
 }
 
+/* per-creature travel keyframe: cross the tank, then HOLD off-screen for the rest of
+   the cycle so creatures come and go instead of all being on screen at once */
+function travelCSS(id, c){
+  const vis=(c.cf!=null?c.cf:0.5);
+  const mid=(vis*50).toFixed(1), end=(vis*100).toFixed(1);
+  if(c.dir==="L"){
+    _css+=`@keyframes tr_${id}{0%{transform:translate3d(140vw,0,0);}`
+       +`${mid}%{transform:translate3d(50vw,-1.3vh,0);}`
+       +`${end}%{transform:translate3d(-40vw,0,0);}`
+       +`100%{transform:translate3d(-40vw,0,0);}}`;
+  } else {
+    _css+=`@keyframes tr_${id}{0%{transform:translate3d(-40vw,0,0);}`
+       +`${mid}%{transform:translate3d(50vw,-1.3vh,0);}`
+       +`${end}%{transform:translate3d(140vw,0,0);}`
+       +`100%{transform:translate3d(140vw,0,0);}}`;
+  }
+  return "tr_"+id;
+}
+
 function buildLife(){
   const life=document.getElementById("life");
   SWIMMERS.forEach(a=>{
     const inner=frameCSS(a.k, a);
+    const trk=travelCSS(a.k, a);
     const sw=document.createElement("div");
     sw.className="swimmer"; sw.style.top=a.top+"vh"; if(a.op!=null) sw.style.opacity=a.op;
-    sw.style.animation=(a.dir==="L"?"swimL":"swimR")+" "+a.dur+"s linear "+a.delay+"s infinite";
+    sw.style.animation=trk+" "+a.dur+"s linear "+a.delay+"s infinite";
     const dir=(a.dir==="L"?-1:1);
+    const bstyle=(a.br?"--bobr:"+a.br+";":"")+(a.by?"--boby:"+a.by+";":"")
+      +"animation:bob "+(3+Math.random()*3).toFixed(2)+"s ease-in-out "+(-Math.random()*4).toFixed(2)+"s infinite alternate;";
     sw.innerHTML='<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
-      +'<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'+inner+'</div></div>';
+      +'<div class="bob" style="'+bstyle+'">'
+      +'<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'+inner+'</div>'
+      +'</div></div>';
     life.appendChild(sw);
   });
   JELLIES.forEach(j=>{
@@ -347,7 +374,7 @@ function buildLife(){
     life.appendChild(el);
   });
   // bubbles
-  for(let i=0;i<13;i++){
+  for(let i=0;i<8;i++){
     const b=document.createElement("div"); const sz=(10+Math.random()*26);
     b.className="bubble"; b.style.width=sz+"px"; b.style.height=sz+"px";
     b.style.left=(Math.random()*100)+"vw"; b.style.setProperty("--wx",((Math.random()*6-3))+"vw");
