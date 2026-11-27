@@ -320,31 +320,40 @@ const _imgs={};
 function gimg(src){ let im=_imgs[src]; if(!im){ im=new Image(); im.src=src; _imgs[src]=im; } return im; }
 const cv=document.getElementById("life"), cx=cv.getContext("2d");
 let CW=0, CH=0, CS=1;
-const LIFE_RES=0.62;  // render the life canvas BELOW display resolution: big fill-rate win on the weak TV GPU; fish keep the same on-screen size (just softer)
+const LIFE_RES=0.70;  // v1.11.2: nudged 0.62->0.70 for crispness (fewer concurrent creatures frees the fill-rate). If the TV janks, THIS is the first dial to turn back down.
 function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=Math.round(w*LIFE_RES); CH=cv.height=Math.round(h*LIFE_RES); CS=CW/1920; }
 window.addEventListener("resize",sizeLife);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 
 function Fish(sp){ this.sp=sp; this.im=gimg(sp.f);
   const now=performance.now()/1000; this.respawn(now);
-  if(Math.random()<.6) this.x=rnd(.06,.94)*CW;                 // begin mid-tank
+  if(Math.random()<.5) this.x=rnd(.06,.94)*CW;                 // begin mid-tank
   else { this.state="wait"; this.waitUntil=now+rnd(1,16); } }  // begin off-screen, enter soon
 Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
 Fish.prototype.respawn=function(t){ const sp=this.sp;
-  this.depth=rnd(.3,1); this.dir=(Math.random()<.5?1:-1);
+  this.depth0=rnd(.3,1); this.depth=this.depth0; this.dir=(Math.random()<.5?1:-1);
   // per-individual colour variation so repeats of a species never look identical ("clipart")
-  this.hue=rnd(-16,16); this.bri=(.9+rnd(0,.2)).toFixed(3); this.sat=(.86+rnd(0,.28)).toFixed(3);
-  const b=sp.band||[.3,.7]; this.baseY=rnd(b[0],b[1])*CH;
+  this.hue=rnd(-16,16); this.bri=+(.9+rnd(0,.2)).toFixed(3); this.sat=+(.86+rnd(0,.28)).toFixed(3);
+  const b=sp.band||[.3,.7]; this.band=b; this.baseY=rnd(b[0],b[1])*CH;
   this.ampY=(sp.flat?rnd(.002,.007):rnd(.015,.04))*CH; this.freqY=rnd(.15,.35); this.phaseY=rnd(0,6.28);
+  // motion individuality: per-fish speed, a surge/glide pulse, slow vertical drift, slow depth drift (nearer/farther)
+  this.spdMul=rnd(.80,1.18); this.pulseF=rnd(1.4,2.4); this.pulseP=rnd(0,6.28);
+  this.vDrift=(sp.flat?0:rnd(-6,6))*CS; this.ddF=rnd(.05,.12); this.ddP=rnd(0,6.28);
   const hw=sp.fw*this.sc()*.5; this.x=(this.dir>0)?-hw-20:CW+hw+20; this.y=this.baseY;
   this.t0=t; this.state="swim"; };
 Fish.prototype.step=function(t,dt){
   if(this.state==="wait"){ if(t>=this.waitUntil) this.respawn(t); return; }
-  this.x+=this.sp.spd*(.5+.6*this.depth)*CS*this.dir*dt;
+  // slow depth drift -> live scale / haze / speed breathe (nearer & farther mid-path)
+  this.depth=Math.max(.25,Math.min(1,this.depth0+.07*Math.sin(t*this.ddF+this.ddP)));
+  // surge/glide: speed pulses with the tail beat, times this fish's own pace
+  const surge=1+.15*Math.sin(t*this.pulseF+this.pulseP);
+  this.x+=this.sp.spd*this.spdMul*surge*(.5+.6*this.depth)*CS*this.dir*dt;
+  // gentle vertical drift so paths angle instead of running dead flat (clamped to the band)
+  this.baseY=Math.max(this.band[0]*CH,Math.min(this.band[1]*CH,this.baseY+this.vDrift*dt));
   this.y=this.baseY+this.ampY*Math.sin(t*this.freqY+this.phaseY);
   const hw=this.sp.fw*this.sc()*.6;
   if((this.dir>0&&this.x>CW+hw)||(this.dir<0&&this.x<-hw)){
-    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?26:5, this.sp.rare?55:18); } };
+    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?30:9, this.sp.rare?64:24); } };
 Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
   const sp=this.sp, im=this.im; if(!im.complete||!im.naturalWidth) return;
   const N=sp.n-(sp.skip!=null?1:0); let fi=Math.floor((t-this.t0)*sp.fps)%N; if(sp.skip!=null&&fi>=sp.skip) fi++;
@@ -352,7 +361,9 @@ Fish.prototype.draw=function(t){ if(this.state!=="swim") return;
   const scale=this.sc(), alpha=(.55+.45*this.depth)*(sp.dim||1);
   const vy=this.ampY*this.freqY*Math.cos(t*this.freqY+this.phaseY), tilt=Math.atan2(vy,80)*.5*this.dir;
   cx.save(); cx.globalAlpha=alpha;
-  cx.filter="hue-rotate("+this.hue+"deg) brightness("+this.bri+") saturate("+this.sat+")";
+  // depth haze: far creatures lose saturation + dim a touch (atmospheric perspective) so they sit INSIDE the water, not on top
+  const hz=.60+.40*this.depth, dz=.86+.14*this.depth;
+  cx.filter="hue-rotate("+this.hue+"deg) brightness("+(this.bri*dz).toFixed(3)+") saturate("+(this.sat*hz).toFixed(3)+")";
   cx.translate(this.x,this.y); cx.rotate(tilt);
   cx.scale(this.dir*scale, scale);
   // inset the source rect by 0.5px so bilinear sampling can't bleed the neighbouring atlas frame
