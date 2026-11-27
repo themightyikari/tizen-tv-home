@@ -114,6 +114,8 @@
   .port .glass::after {background-image:url(porthole_ring_focus.png); opacity:0;}
   .port .emoji{position:relative; z-index:1; font-size:4.1vw; line-height:1;
     filter:drop-shadow(0 3px 7px rgba(0,0,0,.5));}
+  .port .iconimg{position:relative; z-index:1; width:6.2vw; height:6.2vw; object-fit:contain;
+    filter:drop-shadow(0 3px 7px rgba(0,0,0,.55));}
   .port .label{font-size:1.1vw; font-weight:600; color:var(--muted);
     text-shadow:0 2px 10px rgba(0,22,45,.8);}
   .port.unavailable{opacity:.4;}
@@ -124,7 +126,8 @@
     padding:1.05vh 2.1vw; border-radius:999px; background:var(--panel);
     border:2px solid var(--panel-border); box-shadow:0 8px 22px rgba(0,0,0,.3);
     transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;}
-  .navbtn .emoji{font-size:1.6vw;} .navbtn .label{font-size:1.15vw; font-weight:600; color:var(--muted);}
+  .navbtn .emoji{font-size:1.6vw;} .navbtn .naviconimg{width:2.1vw; height:2.1vw; object-fit:contain; vertical-align:middle;}
+  .navbtn .label{font-size:1.15vw; font-weight:600; color:var(--muted);}
 
   /* ---- focus states ---- */
   .port.focused .glass{transform:scale(1.12); filter:drop-shadow(0 0 16px var(--accent, rgba(120,235,255,.85)));}
@@ -184,17 +187,17 @@ const CONFIG = {
   timeZone: "America/New_York",
   weather: { city:"Summerville", lat:33.02, lon:-80.18, unit:"fahrenheit" },
   tiles: [
-    { label:"Disney+",     emoji:"🏰", app:"MCmYXNxgcu.DisneyPlus",   accent:"rgba(60,130,255,.85)" },
-    { label:"Netflix",     emoji:"🔴", app:"org.tizen.netflix-app",   accent:"rgba(229,9,20,.85)" },
-    { label:"Peacock",     emoji:"🦚", app:"gzcc4LRFBF.Peacock",      accent:"rgba(245,166,35,.85)" },
-    { label:"Max",         emoji:"🎬", app:"5b8c3eb16b.BeamCTVDev",   accent:"rgba(123,97,255,.85)" },
-    { label:"Paramount+",  emoji:"⛰️", app:"rJyOSqC6Up.CBSAllAccess", accent:"rgba(0,100,255,.85)" },
-    { label:"Prime Video", emoji:"📦", app:"org.tizen.primevideo",    accent:"rgba(0,168,225,.85)" },
-    { label:"Hulu",        emoji:"🟢", app:"LBUAQX1exg.Hulu",         accent:"rgba(28,231,131,.85)" },
+    { label:"Disney+",     emoji:"🏰", icon:"icon_disney.png",    app:"MCmYXNxgcu.DisneyPlus",   accent:"rgba(60,130,255,.85)" },
+    { label:"Netflix",     emoji:"🔴", icon:"icon_netflix.png",   app:"org.tizen.netflix-app",   accent:"rgba(229,9,20,.85)" },
+    { label:"Peacock",     emoji:"🦚", icon:"icon_peacock.png",   app:"gzcc4LRFBF.Peacock",      accent:"rgba(245,166,35,.85)" },
+    { label:"Max",         emoji:"🎬", icon:"icon_max.png",       app:"5b8c3eb16b.BeamCTVDev",   accent:"rgba(123,97,255,.85)" },
+    { label:"Paramount+",  emoji:"⛰️", icon:"icon_paramount.png", app:"rJyOSqC6Up.CBSAllAccess", accent:"rgba(0,100,255,.85)" },
+    { label:"Prime Video", emoji:"📦", icon:"icon_prime.png",     app:"org.tizen.primevideo",    accent:"rgba(0,168,225,.85)" },
+    { label:"Hulu",        emoji:"🟢", icon:"icon_hulu.png",      app:"LBUAQX1exg.Hulu",         accent:"rgba(28,231,131,.85)" },
   ],
   nav: [
-    { label:"TV Home",   emoji:"🏠", action:"home" },
-    { label:"TizenBrew", emoji:"🧩", action:"tizenbrew" },
+    { label:"TV Home",   emoji:"🏠", icon:"icon_home.png",      action:"home" },
+    { label:"TizenBrew", emoji:"🧩", icon:"icon_tizenbrew.png", action:"tizenbrew" },
   ],
   tizenbrewApp: "xvvl3S1bvH.TizenBrewStandalone"
 };
@@ -256,15 +259,18 @@ const LIFE={
   // f=sheet, fw/fh=frame, n=frames, fps, cols/rows=atlas (omit => single-row strip),
   // s=base scale, band=[min,max] vertical zone (fraction of height), spd=px/s @1920w,
   // dim=extra fog, rare=long gaps, pair=spawn two, flat=minimal vertical bob
+  // v3 (2026-11-27): 6 actors re-rendered to 18 real articulated frames (6x3 atlases),
+  // all padded (>=8% clear alpha on every side), school white-patch fixed. Dims/fps/atlas
+  // from animation_manifest_v3.json. s tuned to hold ~the same on-screen size as v2.
   fish:[
-    {f:"fish_clownfish_atlas.png",    fw:360,fh:220,n:12,fps:9,  cols:6,rows:2, s:.80, band:[.12,.40], spd:70},
-    {f:"fish_bluetang_strip.png",     fw:320,fh:200,n:12,fps:8,                 s:.78, band:[.34,.56], spd:62},
-    {f:"fish_angelfish_atlas.png",    fw:420,fh:300,n:12,fps:6,  cols:6,rows:2, s:.72, band:[.46,.66], spd:50},
-    {f:"fish_yellow_small_strip.png", fw:160,fh:110,n:12,fps:10,                s:.95, band:[.10,.34], spd:82, pair:true},
-    {f:"school_atlas.png",            fw:360,fh:200,n:12,fps:10, cols:6,rows:2, s:.66, band:[.24,.46], spd:66, skip:5},  // frame 5 has an un-cleaned white patch (art bug); skip it until the sheet is re-delivered
-    {f:"turtle_atlas.png",            fw:520,fh:360,n:12,fps:6,  cols:6,rows:2, s:.60, band:[.50,.70], spd:40},
-    {f:"crab_strip.png",              fw:180,fh:120,n:10,fps:8,                 s:.50, band:[.90,.92], spd:24, flat:true},
-    {f:"shark_silhouette_atlas.png",  fw:640,fh:260,n:12,fps:6,  cols:6,rows:2, s:.55, band:[.40,.60], spd:46, dim:.5, rare:true},
+    {f:"fish_clownfish_atlas.png",    fw:292,fh:180,n:18,fps:13.5, cols:6,rows:3, s:.99,  band:[.12,.40], spd:70},
+    {f:"fish_bluetang_atlas.png",     fw:260,fh:164,n:18,fps:12,   cols:6,rows:3, s:.96,  band:[.34,.56], spd:62},
+    {f:"fish_angelfish_atlas.png",    fw:342,fh:244,n:18,fps:9,    cols:6,rows:3, s:.88,  band:[.46,.66], spd:50},
+    {f:"fish_yellow_small_strip.png", fw:130,fh:90, n:18,fps:15,                  s:1.15, band:[.10,.34], spd:82, pair:true},
+    {f:"school_atlas.png",            fw:294,fh:162,n:18,fps:15,   cols:6,rows:3, s:.81,  band:[.24,.46], spd:66},
+    {f:"turtle_atlas.png",            fw:424,fh:294,n:18,fps:9,    cols:6,rows:3, s:.74,  band:[.50,.70], spd:40},
+    {f:"crab_strip.png",              fw:180,fh:120,n:10,fps:8,                   s:.55,  band:[.90,.92], spd:24, flat:true},
+    {f:"shark_silhouette_atlas.png",  fw:640,fh:260,n:12,fps:6,    cols:6,rows:2, s:.56,  band:[.40,.60], spd:46, dim:.5, rare:true},
   ],
   jelly:[
     {f:"jellyfish_strip.png",       fw:260,fh:360,n:14,fps:6, s:.80},
@@ -464,14 +470,16 @@ function build(){
     el.className="port"+(t.installed===false?" unavailable":""); el.tabIndex=0;
     el.dataset.type="app"; el.dataset.app=t.app; el.dataset.label=t.label;
     if(t.accent) el.style.setProperty("--accent",t.accent);
-    el.innerHTML=`<div class="glass"><div class="emoji">${t.emoji}</div></div><div class="label">${t.label}</div>`;
+    const ic=t.icon?`<img class="iconimg" src="${t.icon}" alt="">`:`<div class="emoji">${t.emoji}</div>`;
+    el.innerHTML=`<div class="glass">${ic}</div><div class="label">${t.label}</div>`;
     el.addEventListener("click",()=>{ focusEl(el); activateEl(el); });
     portEl.appendChild(el);
   });
   navEl.innerHTML="";
   CONFIG.nav.forEach(n=>{
     const el=document.createElement("div"); el.className="navbtn"; el.tabIndex=0; el.dataset.type=n.action;
-    el.innerHTML=`<span class="emoji">${n.emoji}</span><span class="label">${n.label}</span>`;
+    const ic=n.icon?`<img class="naviconimg" src="${n.icon}" alt="">`:`<span class="emoji">${n.emoji}</span>`;
+    el.innerHTML=`${ic}<span class="label">${n.label}</span>`;
     el.addEventListener("click",()=>{ focusEl(el); activateEl(el); });
     navEl.appendChild(el);
   });
