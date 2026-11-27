@@ -30,7 +30,7 @@
   /* ---- drifting volumetric god-rays (artist overlay, slow lateral pan) ---- */
   #godrays{position:fixed; top:0; left:50%; width:133.34vw; height:100vh; margin-left:-66.67vw;
     background:url(godrays_overlay.png) center center / 100% 100% no-repeat;
-    opacity:.14; z-index:-7; pointer-events:none; will-change:transform;
+    opacity:.11; z-index:-7; pointer-events:none; will-change:transform;
     animation:grPan 46s ease-in-out infinite alternate;}
   @keyframes grPan{from{transform:translate3d(-150px,0,0);} to{transform:translate3d(150px,0,0);}}
 
@@ -44,7 +44,7 @@
     width:calc(100% + 1024px); height:calc(100% + 1024px);
     background-repeat:repeat; will-change:transform;}
   #caustics .c.a{background-image:url(caustics_tile.png); background-size:1024px 1024px;
-    opacity:.36; animation:cpanA 62s linear infinite;}
+    opacity:.42; animation:cpanA 62s linear infinite;}
   #caustics .c.b{background-image:url(caustics_tile.png); background-size:1403px 1403px;
     opacity:.20; animation:cpanB 94s linear infinite;}
   @keyframes cpanA{from{transform:translate3d(0,0,0);} to{transform:translate3d(-1024px,-1024px,0);}}
@@ -147,7 +147,7 @@
 <!-- ===== Aquarium scene (artist PNG art, v2 living water) ===== -->
 <div id="bg"></div>
 <div id="godrays"></div>
-<div id="caustics"><div class="c a"></div><div class="c b"></div></div>
+<div id="caustics"><div class="c a"></div></div>
 <div id="kelp"></div>
 <canvas id="life"></canvas>
 <div id="front"></div>
@@ -311,7 +311,8 @@ const _imgs={};
 function gimg(src){ let im=_imgs[src]; if(!im){ im=new Image(); im.src=src; _imgs[src]=im; } return im; }
 const cv=document.getElementById("life"), cx=cv.getContext("2d");
 let CW=0, CH=0, CS=1;
-function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=w; CH=cv.height=h; CS=CW/1920; }
+const LIFE_RES=0.62;  // render the life canvas BELOW display resolution: big fill-rate win on the weak TV GPU; fish keep the same on-screen size (just softer)
+function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=Math.round(w*LIFE_RES); CH=cv.height=Math.round(h*LIFE_RES); CS=CW/1920; }
 window.addEventListener("resize",sizeLife);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 
