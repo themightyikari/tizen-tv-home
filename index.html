@@ -58,7 +58,10 @@
   @keyframes sway3{0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(2.6deg);}}
 
   /* ---- living layer (fish, turtle, crab, jellyfish, bubbles) ---- */
-  #life{position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none;}
+  /* explicit full-viewport size: the canvas is a replaced element, so its low-res
+     buffer must be STRETCHED to the screen via CSS (inset:0 alone would display it
+     at buffer size = 62% of the screen, clipping fish mid-screen) */
+  #life{position:fixed; top:0; left:0; width:100%; height:100%; z-index:-3; pointer-events:none;}
 
   /* #life is now a <canvas>; fish/jellies/bubbles are drawn on it by the JS engine. */
   /* sprite plumbing kept for the DOM plant layer (animated anemone + bubble columns) */
