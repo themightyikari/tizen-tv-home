@@ -5,158 +5,139 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TV Home</title>
 <style>
-  /* ---- THEME ---- */
+  /* ============ AQUARIUM THEME (real art) ============ */
   :root{
-    --text:#ffffff; --muted:#e7f1ff;
-    --xp-blue:#2a6fdb; --focus:#bcd8ff;
-    --radius:20px; --safe-x:5vw; --safe-y:4.5vh;
-    --panel:rgba(8,20,42,.52);
-    --panel-focus:rgba(14,32,66,.86);
-    --panel-border:rgba(255,255,255,.28);
+    --text:#eafcff; --muted:#bfeaf7;
+    --focus:#8ff0ff; --radius:22px;
+    --safe-x:4vw; --safe-y:4vh;
+    --w-top:#1a84b8; --w-mid:#0c5680; --w-deep:#072f49; --w-abyss:#03192b;
+    --panel:rgba(6,30,48,.46);
+    --panel-focus:rgba(10,46,72,.82);
+    --panel-border:rgba(150,230,255,.42);
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
   body{
     font-family:system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    color:var(--text); overflow:hidden; background:#4f93d6;
+    color:var(--text); overflow:hidden;
+    background:linear-gradient(to bottom, var(--w-top) 0%, var(--w-mid) 34%, var(--w-deep) 68%, var(--w-abyss) 100%);
   }
 
-  /* ---- Windows XP "Bliss"-style scene (CSS/SVG homage, drawn from scratch) ---- */
-  #scene{position:fixed; inset:0; z-index:-2;}
-  #scene svg{width:100%; height:100%; display:block;}
-  /* soft scrim so white text stays readable over the bright scene */
+  /* ---- painted reef background (artist PNG) ---- */
+  #bg{position:fixed; inset:0; z-index:-6;
+    background:#072f49 url(reef_background.png) center center / cover no-repeat;}
+
+  /* ---- living layer (fish, jellyfish, bubbles) ---- */
+  #life{position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none;}
+
+  /* animated sprite-sheet swimmers */
+  .swimmer{position:absolute; left:0; will-change:transform;}
+  .fit{display:block; transform-origin:center;}
+  .sprite{overflow:hidden;}
+  .strip{will-change:transform;}
+
+  @keyframes swimR{from{transform:translateX(-32vw);}to{transform:translateX(132vw);}}
+  @keyframes swimL{from{transform:translateX(132vw);}to{transform:translateX(-32vw);}}
+
+  /* per-creature frame cycling (FW*frames) */
+  @keyframes cyc-clownfish{from{transform:translateX(0);}to{transform:translateX(-2880px);}}
+  @keyframes cyc-bluetang {from{transform:translateX(0);}to{transform:translateX(-2560px);}}
+  @keyframes cyc-yellow   {from{transform:translateX(0);}to{transform:translateX(-1280px);}}
+  @keyframes cyc-angelfish{from{transform:translateX(0);}to{transform:translateX(-3360px);}}
+  @keyframes cyc-jelly    {from{transform:translateX(0);}to{transform:translateX(-2600px);}}
+
+  /* drifting jellyfish path (gentle, left side, rises & sinks) */
+  .jelly{position:absolute; left:0; top:0; will-change:transform; animation:driftJelly 30s ease-in-out infinite;}
+  @keyframes driftJelly{
+    0%  {transform:translate(7vw,40vh);}
+    50% {transform:translate(13vw,11vh);}
+    100%{transform:translate(7vw,40vh);}}
+
+  /* bubbles (artist PNG) */
+  .bubble{position:absolute; bottom:-6vh;
+    background:center/contain no-repeat url(bubble.png);
+    will-change:transform,opacity; opacity:0;}
+  @keyframes rise{
+    0%{transform:translateY(0) translateX(0); opacity:0;}
+    12%{opacity:.9;} 85%{opacity:.55;}
+    100%{transform:translateY(-110vh) translateX(var(--wx,2vw)); opacity:0;}}
+
+  /* ---- readability scrim (keeps white clock crisp) ---- */
   #scrim{position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(120vw 70vh at 50% 18%, rgba(0,0,0,0) 40%, rgba(2,14,32,.18) 100%),
-      linear-gradient(to bottom, rgba(2,16,36,.26) 0%, rgba(2,16,36,.02) 26%,
-                      rgba(0,12,28,.10) 62%, rgba(0,8,22,.48) 100%);
-  }
+      radial-gradient(120vw 58vh at 50% 40%, rgba(0,0,0,0) 48%, rgba(2,18,34,.22) 100%),
+      linear-gradient(to bottom, rgba(2,20,36,.26) 0%, rgba(2,20,36,0) 26%, rgba(0,14,26,.30) 100%);}
 
+  /* ---- layout ---- */
   .wrap{height:100%; padding:var(--safe-y) var(--safe-x); display:flex; flex-direction:column;}
-
-  /* ---- top bar ---- */
   header{display:flex; justify-content:space-between; align-items:flex-start;}
-  .greeting{font-size:2.5vw; font-weight:700; letter-spacing:.3px;
-    text-shadow:0 2px 10px rgba(0,30,70,.5), 0 1px 2px rgba(0,0,0,.35);}
-  .greeting small{display:block; color:var(--muted); font-size:1.2vw; font-weight:500; margin-top:.4vh;
-    text-shadow:0 1px 6px rgba(0,25,60,.5);}
-  .weather{text-align:right; min-width:14vw;
-    text-shadow:0 2px 10px rgba(0,30,70,.5), 0 1px 2px rgba(0,0,0,.35);}
+  .greeting{font-size:2.4vw; font-weight:700; letter-spacing:.3px;
+    text-shadow:0 2px 16px rgba(0,30,55,.75);}
+  .greeting small{display:block; color:var(--muted); font-size:1.15vw; font-weight:500; margin-top:.4vh;}
+  .weather{text-align:right; min-width:14vw; text-shadow:0 2px 16px rgba(0,30,55,.75);}
   .weather .w-main{display:flex; align-items:center; justify-content:flex-end; gap:.6vw;}
-  .weather .w-ico{font-size:2.8vw; line-height:1;}
-  .weather .w-temp{font-size:2.6vw; font-weight:700;}
-  .weather .w-sub{font-size:1.2vw; color:var(--muted); margin-top:.2vh; font-weight:500;}
+  .weather .w-ico{font-size:2.6vw;} .weather .w-temp{font-size:2.5vw; font-weight:700;}
+  .weather .w-sub{font-size:1.15vw; color:var(--muted); margin-top:.2vh; font-weight:500;}
 
-  /* ---- clock ---- */
   .clockwrap{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;}
-  .clock{font-size:14vw; font-weight:700; line-height:.95; letter-spacing:-.4vw;
-         text-shadow:0 4px 24px rgba(0,30,70,.55), 0 2px 4px rgba(0,0,0,.35);}
-  .clock .sec{font-size:3.6vw; color:var(--muted); vertical-align:top; margin-left:.4vw; letter-spacing:0;}
-  .date{font-size:2vw; color:var(--muted); margin-top:.8vh; letter-spacing:1px; font-weight:600;
-    text-shadow:0 2px 10px rgba(0,25,60,.55);}
+  .clock{font-size:13vw; font-weight:700; line-height:.95; letter-spacing:-.4vw;
+    text-shadow:0 0 54px rgba(120,230,255,.5), 0 4px 24px rgba(0,25,55,.7);}
+  .clock .sec{font-size:3.4vw; color:var(--muted); vertical-align:top; margin-left:.4vw; letter-spacing:0;}
+  .date{font-size:1.9vw; color:var(--muted); margin-top:.6vh; letter-spacing:1px; font-weight:600;
+    text-shadow:0 2px 14px rgba(0,25,55,.7);}
 
-  /* ---- tiles ---- */
-  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:1.6vw; margin-top:2.6vh;}
-  .tile{
-    background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius);
-    padding:2.1vh 1vw; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:1vh; cursor:pointer; outline:none;
-    box-shadow:0 8px 26px rgba(0,0,0,.22);
-    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  /* ---- app portholes (artist brass-glass rings) ---- */
+  .portholes{display:flex; justify-content:center; gap:1.3vw; margin-top:1.4vh; flex-wrap:nowrap;}
+  .port{width:10vw; display:flex; flex-direction:column; align-items:center; gap:.7vh; cursor:pointer; outline:none;}
+  .port .glass{
+    position:relative; width:10vw; height:10vw;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .16s ease, filter .16s ease;
   }
-  .tile .emoji{font-size:3.2vw; line-height:1; filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));}
-  .tile .label{font-size:1.3vw; font-weight:600; color:var(--muted);}
-  .tile.unavailable{opacity:.4;}
+  /* two stacked rings: resting + glowing, cross-faded on focus (both preloaded, no flash) */
+  .port .glass::before, .port .glass::after{
+    content:""; position:absolute; inset:0;
+    background:center/contain no-repeat; transition:opacity .18s ease;}
+  .port .glass::before{background-image:url(porthole_ring.png); opacity:1;}
+  .port .glass::after {background-image:url(porthole_ring_focus.png); opacity:0;}
+  .port .emoji{position:relative; z-index:1; font-size:4.1vw; line-height:1;
+    filter:drop-shadow(0 3px 7px rgba(0,0,0,.5));}
+  .port .label{font-size:1.1vw; font-weight:600; color:var(--muted);
+    text-shadow:0 2px 10px rgba(0,22,45,.75);}
+  .port.unavailable{opacity:.4;}
 
-  /* ---- bottom nav row ---- */
-  .nav{display:flex; justify-content:center; gap:1.6vw; margin-top:1.8vh;}
-  .navbtn{
-    background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
-    padding:1.3vh 2.4vw; display:flex; align-items:center; gap:.7vw; cursor:pointer; outline:none;
-    box-shadow:0 8px 26px rgba(0,0,0,.22);
-    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease;
-  }
-  .navbtn .emoji{font-size:1.7vw; line-height:1;}
-  .navbtn .label{font-size:1.25vw; font-weight:600; color:var(--muted);}
+  /* ---- bottom nav pills ---- */
+  .nav{display:flex; justify-content:center; gap:1.4vw; margin-top:1.4vh;}
+  .navbtn{display:flex; align-items:center; gap:.6vw; cursor:pointer; outline:none;
+    padding:1.05vh 2.1vw; border-radius:999px; background:var(--panel);
+    border:2px solid var(--panel-border); box-shadow:0 8px 22px rgba(0,0,0,.3);
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;}
+  .navbtn .emoji{font-size:1.6vw;} .navbtn .label{font-size:1.15vw; font-weight:600; color:var(--muted);}
 
-  /* ---- shared focus state ---- */
-  .tile.focused, .navbtn.focused{
-    transform:scale(1.08); background:var(--panel-focus); border-color:var(--focus);
-    box-shadow:0 0 0 4px rgba(90,150,255,.5), 0 18px 48px rgba(0,0,0,.45);
-  }
-  .tile.focused .label, .navbtn.focused .label{color:var(--text);}
+  /* ---- focus states ---- */
+  .port.focused .glass{transform:scale(1.12); filter:drop-shadow(0 0 16px var(--accent, rgba(120,235,255,.8)));}
+  .port.focused .glass::after{opacity:1;}
+  .port.focused .glass::before{opacity:0;}
+  .port.focused .label{color:var(--text);}
+  .navbtn.focused{
+    transform:scale(1.1); border-color:var(--focus);
+    background:var(--panel-focus);
+    box-shadow:0 0 0 4px rgba(120,235,255,.4), 0 0 40px rgba(120,235,255,.7);}
+  .navbtn.focused .label{color:var(--text);}
 
   /* ---- toast ---- */
-  #toast{
-    position:fixed; left:50%; bottom:9vh; transform:translateX(-50%) translateY(20px);
-    background:rgba(6,16,34,.95); border:1px solid var(--panel-border); color:var(--text);
-    padding:1.4vh 2vw; border-radius:16px; font-size:1.4vw; opacity:0; pointer-events:none;
-    transition:opacity .2s ease, transform .2s ease; box-shadow:0 12px 40px rgba(0,0,0,.5);
-  }
+  #toast{position:fixed; left:50%; bottom:3vh; transform:translateX(-50%) translateY(20px);
+    background:rgba(4,22,38,.95); border:1px solid var(--panel-border); color:var(--text);
+    padding:1.3vh 2vw; border-radius:16px; font-size:1.3vw; opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; box-shadow:0 12px 40px rgba(0,0,0,.5); z-index:5;}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
 
-<!-- Windows XP "Bliss"-style background: a hand-built CSS/SVG homage (no copyrighted photo). -->
-<div id="scene">
-  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%"  stop-color="#2e74c4"/>
-        <stop offset="42%" stop-color="#4f93d6"/>
-        <stop offset="74%" stop-color="#9fc9ec"/>
-        <stop offset="100%" stop-color="#e9f4fc"/>
-      </linearGradient>
-      <linearGradient id="hill" x1="0" y1="0" x2="0.15" y2="1">
-        <stop offset="0%"  stop-color="#9fd14a"/>
-        <stop offset="30%" stop-color="#7cb23a"/>
-        <stop offset="70%" stop-color="#5f8f2b"/>
-        <stop offset="100%" stop-color="#4a7322"/>
-      </linearGradient>
-      <radialGradient id="sun" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-      </radialGradient>
-      <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur stdDeviation="18"/>
-      </filter>
-    </defs>
-
-    <!-- sky -->
-    <rect x="0" y="0" width="1600" height="900" fill="url(#sky)"/>
-    <!-- subtle sun glow upper-left, like the original -->
-    <ellipse cx="430" cy="210" rx="520" ry="360" fill="url(#sun)"/>
-
-    <!-- clouds -->
-    <g fill="#ffffff" filter="url(#soft)">
-      <g opacity="0.92">
-        <ellipse cx="300" cy="200" rx="150" ry="42"/>
-        <ellipse cx="400" cy="178" rx="120" ry="48"/>
-        <ellipse cx="220" cy="225" rx="110" ry="36"/>
-      </g>
-      <g opacity="0.85">
-        <ellipse cx="1180" cy="150" rx="170" ry="40"/>
-        <ellipse cx="1290" cy="135" rx="120" ry="46"/>
-        <ellipse cx="1080" cy="170" rx="110" ry="34"/>
-      </g>
-      <g opacity="0.7">
-        <ellipse cx="760" cy="120" rx="140" ry="30"/>
-        <ellipse cx="850" cy="108" rx="95" ry="34"/>
-      </g>
-      <g opacity="0.6">
-        <ellipse cx="1480" cy="300" rx="150" ry="34"/>
-      </g>
-    </g>
-
-    <!-- rolling green hill -->
-    <path d="M0,585 C 280,478 520,452 770,505 C 1020,558 1270,636 1600,598 L 1600,900 L 0,900 Z"
-          fill="url(#hill)"/>
-    <!-- sunlit crest highlight -->
-    <path d="M0,585 C 280,478 520,452 770,505 C 1020,558 1270,636 1600,598"
-          fill="none" stroke="#c7ec6e" stroke-width="7" opacity="0.55"/>
-  </svg>
-</div>
+<!-- ===== Aquarium scene (artist PNG art) ===== -->
+<div id="bg"></div>
+<div id="life"></div>
 <div id="scrim"></div>
 
 <div class="wrap">
@@ -170,237 +151,215 @@
     <div class="date" id="date">&nbsp;</div>
   </div>
 
-  <div class="tiles" id="tiles"></div>
+  <div class="portholes" id="portholes"></div>
   <div class="nav" id="nav"></div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-/* ================== CONFIG (edit me) ================== */
+/* ================== CONFIG ================== */
 const CONFIG = {
-  name: "",                 // put your name for a personal greeting, e.g. "Alex"
-  clock24h: false,          // true = 24-hour clock
-  timeZone: "America/New_York",   // East Coast; auto-handles EST/EDT
-  weather: {
-    city: "Summerville",    // display label
-    lat: 33.02, lon: -80.18, // Summerville, SC
-    unit: "fahrenheit"      // "fahrenheit" or "celsius"
-  },
-  // Exact app IDs read and verified from THIS TV's installed-app list.
+  name: "",
+  clock24h: false,
+  timeZone: "America/New_York",
+  weather: { city:"Summerville", lat:33.02, lon:-80.18, unit:"fahrenheit" },
   tiles: [
-    { label:"Disney+",     emoji:"🏰", app:"MCmYXNxgcu.DisneyPlus" },
-    { label:"Netflix",     emoji:"🔴", app:"org.tizen.netflix-app" },
-    { label:"Peacock",     emoji:"🦚", app:"gzcc4LRFBF.Peacock" },
-    { label:"Max",         emoji:"🎬", app:"5b8c3eb16b.BeamCTVDev" },
-    { label:"Paramount+",  emoji:"⛰️", app:"rJyOSqC6Up.CBSAllAccess" },
-    { label:"Prime Video", emoji:"📦", app:"org.tizen.primevideo" },
-    { label:"Hulu",        emoji:"🟢", app:"LBUAQX1exg.Hulu" },
+    { label:"Disney+",     emoji:"🏰", app:"MCmYXNxgcu.DisneyPlus",   accent:"rgba(60,130,255,.85)" },
+    { label:"Netflix",     emoji:"🔴", app:"org.tizen.netflix-app",   accent:"rgba(229,9,20,.85)" },
+    { label:"Peacock",     emoji:"🦚", app:"gzcc4LRFBF.Peacock",      accent:"rgba(245,166,35,.85)" },
+    { label:"Max",         emoji:"🎬", app:"5b8c3eb16b.BeamCTVDev",   accent:"rgba(123,97,255,.85)" },
+    { label:"Paramount+",  emoji:"⛰️", app:"rJyOSqC6Up.CBSAllAccess", accent:"rgba(0,100,255,.85)" },
+    { label:"Prime Video", emoji:"📦", app:"org.tizen.primevideo",    accent:"rgba(0,168,225,.85)" },
+    { label:"Hulu",        emoji:"🟢", app:"LBUAQX1exg.Hulu",         accent:"rgba(28,231,131,.85)" },
   ],
-  columns: 3,
-  // bottom nav buttons
   nav: [
     { label:"TV Home",   emoji:"🏠", action:"home" },
     { label:"TizenBrew", emoji:"🧩", action:"tizenbrew" },
   ],
   tizenbrewApp: "xvvl3S1bvH.TizenBrewStandalone"
 };
-/* ===================================================== */
+/* ============================================ */
 
 const pad = n => String(n).padStart(2,"0");
-
-// Get the current time in CONFIG.timeZone, resilient on old webviews.
 function nowParts(){
   try{
-    const f = new Intl.DateTimeFormat("en-US",{
-      timeZone: CONFIG.timeZone, hour12:false,
-      hour:"2-digit", minute:"2-digit", second:"2-digit",
-      weekday:"long", month:"long", day:"numeric"
-    });
-    const o = {}; f.formatToParts(new Date()).forEach(p => o[p.type] = p.value);
-    let h = parseInt(o.hour,10); if(h === 24) h = 0;      // some engines emit "24"
+    const f = new Intl.DateTimeFormat("en-US",{ timeZone:CONFIG.timeZone, hour12:false,
+      hour:"2-digit", minute:"2-digit", second:"2-digit", weekday:"long", month:"long", day:"numeric" });
+    const o={}; f.formatToParts(new Date()).forEach(p=>o[p.type]=p.value);
+    let h=parseInt(o.hour,10); if(h===24) h=0;
     return { h, m:o.minute, s:o.second, weekday:o.weekday, month:o.month, day:o.day };
   }catch(e){
-    const d = new Date();
+    const d=new Date();
     return { h:d.getHours(), m:pad(d.getMinutes()), s:pad(d.getSeconds()),
       weekday:d.toLocaleDateString(undefined,{weekday:"long"}),
       month:d.toLocaleDateString(undefined,{month:"long"}), day:String(d.getDate()) };
   }
 }
-
 function tickClock(){
-  const t = nowParts();
-  let h = t.h;
-  if(!CONFIG.clock24h){ h = h % 12 || 12; }
-  document.getElementById("hhmm").textContent = (CONFIG.clock24h ? pad(h) : h) + ":" + t.m;
-  document.getElementById("sec").textContent = t.s;
-  document.getElementById("date").textContent = t.weekday + ", " + t.month + " " + t.day;
-  const part = t.h < 12 ? "Good morning" : t.h < 18 ? "Good afternoon" : "Good evening";
-  document.getElementById("greeting").childNodes[0].nodeValue =
-    CONFIG.name ? part + ", " + CONFIG.name : part;
+  const t=nowParts(); let h=t.h; if(!CONFIG.clock24h){ h=h%12||12; }
+  document.getElementById("hhmm").textContent=(CONFIG.clock24h?pad(h):h)+":"+t.m;
+  document.getElementById("sec").textContent=t.s;
+  document.getElementById("date").textContent=t.weekday+", "+t.month+" "+t.day;
+  const part=t.h<12?"Good morning":t.h<18?"Good afternoon":"Good evening";
+  document.getElementById("greeting").childNodes[0].nodeValue=CONFIG.name?part+", "+CONFIG.name:part;
 }
-setInterval(tickClock, 1000); tickClock();
+setInterval(tickClock,1000); tickClock();
 
-/* ---- weather (Open-Meteo, no API key) ---- */
-const WICON = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",
-  61:"🌦️",63:"🌧️",65:"🌧️",66:"🌧️",67:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",77:"🌨️",
-  80:"🌦️",81:"🌧️",82:"⛈️",85:"🌨️",86:"❄️",95:"⛈️",96:"⛈️",99:"⛈️"};
-const WTEXT = {0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Cloudy",45:"Fog",48:"Fog",
-  51:"Drizzle",53:"Drizzle",55:"Drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",
-  66:"Freezing rain",67:"Freezing rain",71:"Light snow",73:"Snow",75:"Heavy snow",77:"Snow",
-  80:"Showers",81:"Showers",82:"Storms",85:"Snow showers",86:"Snow",95:"Thunderstorm",
-  96:"Thunderstorm",99:"Thunderstorm"};
+/* ---- weather ---- */
+const WICON={0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",61:"🌦️",63:"🌧️",65:"🌧️",
+  66:"🌧️",67:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",77:"🌨️",80:"🌦️",81:"🌧️",82:"⛈️",85:"🌨️",86:"❄️",95:"⛈️",96:"⛈️",99:"⛈️"};
+const WTEXT={0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Cloudy",45:"Fog",48:"Fog",51:"Drizzle",53:"Drizzle",
+  55:"Drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",66:"Freezing rain",67:"Freezing rain",71:"Light snow",
+  73:"Snow",75:"Heavy snow",77:"Snow",80:"Showers",81:"Showers",82:"Storms",85:"Snow showers",86:"Snow",
+  95:"Thunderstorm",96:"Thunderstorm",99:"Thunderstorm"};
 async function loadWeather(){
-  const w = CONFIG.weather;
+  const w=CONFIG.weather;
   try{
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}`
-            + `&current=temperature_2m,weather_code&temperature_unit=${w.unit}`
-            + `&timezone=${encodeURIComponent(CONFIG.timeZone)}`;
-    const r = await fetch(u); const d = await r.json();
-    const t = Math.round(d.current.temperature_2m);
-    const code = d.current.weather_code;
-    const ico = WICON[code] || "🌡️";
-    const cond = WTEXT[code] || "";
-    document.getElementById("weather").innerHTML =
-      `<div class="w-main"><span class="w-ico">${ico}</span><span class="w-temp">${t}°</span></div>`
-    + `<div class="w-sub">${cond ? cond + " · " : ""}${w.city}</div>`;
-  }catch(e){
-    document.getElementById("weather").innerHTML = `<div class="w-sub">${w.city}</div>`;
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}`
+      +`&current=temperature_2m,weather_code&temperature_unit=${w.unit}&timezone=${encodeURIComponent(CONFIG.timeZone)}`;
+    const r=await fetch(u); const d=await r.json();
+    const t=Math.round(d.current.temperature_2m); const code=d.current.weather_code;
+    document.getElementById("weather").innerHTML=
+      `<div class="w-main"><span class="w-ico">${WICON[code]||"🌡️"}</span><span class="w-temp">${t}°</span></div>`
+      +`<div class="w-sub">${(WTEXT[code]?WTEXT[code]+" · ":"")}${w.city}</div>`;
+  }catch(e){ document.getElementById("weather").innerHTML=`<div class="w-sub">${w.city}</div>`; }
+}
+loadWeather(); setInterval(loadWeather,15*60*1000);
+
+/* ================== aquarium life (real sprite sheets) ================== */
+/* Each fish: outer swimmer travels across screen; .fit scales for depth + mirrors for
+   left travel; .sprite is the frame window; .strip cycles frames (GPU transforms only). */
+const SWIMMERS=[
+  // name,        strip file,                   fw,  fh,  frames, cycKey,      scale, top(vh), dur(s), dir, delay(s)
+  {k:"clownfish", f:"fish_clownfish_strip.png",  fw:360, fh:220, n:8,  cyc:"cyc-clownfish", cdur:1.0,   s:.80, top:20, dur:40, dir:"R", delay:-4},
+  {k:"bluetang",  f:"fish_bluetang_strip.png",   fw:320, fh:200, n:8,  cyc:"cyc-bluetang",  cdur:1.0,   s:.78, top:42, dur:48, dir:"L", delay:-22},
+  {k:"angelfish", f:"fish_angelfish_strip.png",  fw:420, fh:300, n:8,  cyc:"cyc-angelfish", cdur:1.333, s:.72, top:55, dur:58, dir:"R", delay:-12},
+  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.95, top:16, dur:30, dir:"R", delay:-3},
+  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.75, top:12, dur:33, dir:"R", delay:-9},
+  {k:"yellow",    f:"fish_yellow_small_strip.png",fw:160, fh:110, n:8, cyc:"cyc-yellow",    cdur:1.0,   s:.60, top:24, dur:36, dir:"R", delay:-16},
+];
+function buildLife(){
+  const life=document.getElementById("life");
+
+  SWIMMERS.forEach(a=>{
+    const sw=document.createElement("div");
+    sw.className="swimmer";
+    sw.style.top=a.top+"vh";
+    sw.style.animation=(a.dir==="L"?"swimL":"swimR")+" "+a.dur+"s linear "+a.delay+"s infinite";
+    const dir=(a.dir==="L"?-1:1);
+    sw.innerHTML=
+      '<div class="fit" style="transform:scale('+a.s+') scaleX('+dir+');">'
+      + '<div class="sprite" style="width:'+a.fw+'px;height:'+a.fh+'px;">'
+      +   '<div class="strip" style="width:'+(a.fw*a.n)+'px;height:'+a.fh+'px;'
+      +     'background:url('+a.f+') 0 0/100% 100% no-repeat;'
+      +     'animation:'+a.cyc+' '+a.cdur+'s steps('+a.n+') infinite;"></div>'
+      + '</div></div>';
+    life.appendChild(sw);
+  });
+
+  // drifting jellyfish (bell pulse = sprite cycle)
+  const jf={fw:260, fh:360, n:10, cdur:1.667};
+  const j=document.createElement("div"); j.className="jelly";
+  j.innerHTML=
+    '<div class="fit" style="transform:scale(.8);">'
+    + '<div class="sprite" style="width:'+jf.fw+'px;height:'+jf.fh+'px;">'
+    +   '<div class="strip" style="width:'+(jf.fw*jf.n)+'px;height:'+jf.fh+'px;'
+    +     'background:url(jellyfish_strip.png) 0 0/100% 100% no-repeat;'
+    +     'animation:cyc-jelly '+jf.cdur+'s steps('+jf.n+') infinite;"></div>'
+    + '</div></div>';
+  life.appendChild(j);
+
+  // bubbles
+  for(let i=0;i<13;i++){
+    const b=document.createElement("div"); const sz=(10+Math.random()*26); // px
+    b.className="bubble"; b.style.width=sz+"px"; b.style.height=sz+"px";
+    b.style.left=(Math.random()*100)+"vw"; b.style.setProperty("--wx",((Math.random()*6-3))+"vw");
+    b.style.animation="rise "+(10+Math.random()*10)+"s linear "+(-Math.random()*18)+"s infinite";
+    life.appendChild(b);
   }
 }
-loadWeather(); setInterval(loadWeather, 15*60*1000);
+buildLife();
 
 /* ================== launcher / remote nav ================== */
-// On the TV, the module page has NO window.tizen (served over localhost). Native
-// launching + "go home" go through service.js, a tiny Node service TizenBrew runs
-// WITH tizen access, exposed on localhost. A direct-tizen path is kept as a fallback
-// and the browser preview just shows a friendly toast.
-const SERVICE   = "http://127.0.0.1:8099";
-const HAS_TIZEN = typeof window.tizen !== "undefined" && !!window.tizen.application;
-
-function toast(msg){
-  const t = document.getElementById("toast");
-  t.textContent = msg; t.classList.add("show");
-  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200);
+const SERVICE="http://127.0.0.1:8099";
+const HAS_TIZEN=typeof window.tizen!=="undefined" && !!window.tizen.application;
+function toast(msg){const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function launchViaService(appId,label,triesLeft=6){
+  fetch(SERVICE+"/api/launch",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({id:appId})})
+  .then(r=>r.json()).then(d=>{ if(d&&d.ok) toast("Opening "+label+"…");
+    else toast("Couldn't launch "+label+(d&&d.error?" ("+d.error+")":"")); })
+  .catch(()=>{ if(triesLeft>0) setTimeout(()=>launchViaService(appId,label,triesLeft-1),400);
+    else toast(label+": launcher service not reachable (works on the TV)"); });
 }
-
-function launchViaService(appId, label, triesLeft = 6){
-  fetch(SERVICE + "/api/launch", {
-    method:"POST", headers:{ "Content-Type":"text/plain" }, // simple request -> no CORS preflight
-    body: JSON.stringify({ id: appId })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if(d && d.ok) toast("Opening " + label + "…");
-    else toast("Couldn't launch " + label + (d && d.error ? " (" + d.error + ")" : ""));
-  })
-  .catch(() => {
-    if(triesLeft > 0) setTimeout(() => launchViaService(appId, label, triesLeft - 1), 400);
-    else toast(label + ": launcher service not reachable (works on the TV)");
-  });
-}
-function launchNative(appId, label){
-  if(HAS_TIZEN){
-    try{
-      window.tizen.application.launch(appId,
-        ()=>toast("Opening " + label + "…"),
-        e=>toast("Couldn't launch " + label + " (" + e.name + ")"));
-    }catch(err){ toast("Launch error: " + err.message); }
-    return;
-  }
-  launchViaService(appId, label);
+function launchNative(appId,label){
+  if(HAS_TIZEN){ try{ window.tizen.application.launch(appId,()=>toast("Opening "+label+"…"),
+    e=>toast("Couldn't launch "+label+" ("+e.name+")")); }catch(err){ toast("Launch error: "+err.message); } return; }
+  launchViaService(appId,label);
 }
 function goHome(){
-  if(HAS_TIZEN){
-    try{ window.tizen.application.getCurrentApplication().exit(); return; }
-    catch(err){ /* fall through to service */ }
-  }
+  if(HAS_TIZEN){ try{ window.tizen.application.getCurrentApplication().exit(); return; }catch(err){} }
   toast("Returning to TV home…");
-  fetch(SERVICE + "/api/home", { method:"POST", headers:{ "Content-Type":"text/plain" }, body:"{}" })
-    .catch(() => toast("Home: launcher service not reachable (works on the TV)"));
+  fetch(SERVICE+"/api/home",{method:"POST",headers:{"Content-Type":"text/plain"},body:"{}"})
+    .catch(()=>toast("Home: launcher service not reachable (works on the TV)"));
 }
 
-/* ---- build tiles + nav, then wire D-pad navigation ---- */
-const tilesEl = document.getElementById("tiles");
-const navEl   = document.getElementById("nav");
-const COLS    = CONFIG.columns;
-let rows = [];            // rows of focusable elements for D-pad
-let cur  = { r:0, c:0 };
-
+const portEl=document.getElementById("portholes");
+const navEl=document.getElementById("nav");
+let rows=[], cur={r:0,c:0};
 function activateEl(el){
-  const ty = el.dataset.type;
-  if(ty === "app")        launchNative(el.dataset.app, el.dataset.label);
-  else if(ty === "home")  goHome();
-  else if(ty === "tizenbrew") launchNative(CONFIG.tizenbrewApp, "TizenBrew");
+  const ty=el.dataset.type;
+  if(ty==="app") launchNative(el.dataset.app, el.dataset.label);
+  else if(ty==="home") goHome();
+  else if(ty==="tizenbrew") launchNative(CONFIG.tizenbrewApp,"TizenBrew");
 }
-
 function build(){
-  // tiles
-  tilesEl.innerHTML = "";
-  CONFIG.tiles.forEach(t => {
-    const el = document.createElement("div");
-    el.className = "tile" + (t.installed === false ? " unavailable" : "");
-    el.tabIndex = 0;
-    el.dataset.type = "app"; el.dataset.app = t.app; el.dataset.label = t.label;
-    el.innerHTML = `<div class="emoji">${t.emoji}</div><div class="label">${t.label}</div>`;
-    el.addEventListener("click", ()=>{ focusEl(el); activateEl(el); });
-    tilesEl.appendChild(el);
+  portEl.innerHTML="";
+  CONFIG.tiles.forEach(t=>{
+    const el=document.createElement("div");
+    el.className="port"+(t.installed===false?" unavailable":""); el.tabIndex=0;
+    el.dataset.type="app"; el.dataset.app=t.app; el.dataset.label=t.label;
+    if(t.accent) el.style.setProperty("--accent",t.accent);
+    el.innerHTML=`<div class="glass"><div class="emoji">${t.emoji}</div></div><div class="label">${t.label}</div>`;
+    el.addEventListener("click",()=>{ focusEl(el); activateEl(el); });
+    portEl.appendChild(el);
   });
-  // nav
-  navEl.innerHTML = "";
-  CONFIG.nav.forEach(n => {
-    const el = document.createElement("div");
-    el.className = "navbtn"; el.tabIndex = 0;
-    el.dataset.type = n.action;
-    el.innerHTML = `<span class="emoji">${n.emoji}</span><span class="label">${n.label}</span>`;
-    el.addEventListener("click", ()=>{ focusEl(el); activateEl(el); });
+  navEl.innerHTML="";
+  CONFIG.nav.forEach(n=>{
+    const el=document.createElement("div"); el.className="navbtn"; el.tabIndex=0; el.dataset.type=n.action;
+    el.innerHTML=`<span class="emoji">${n.emoji}</span><span class="label">${n.label}</span>`;
+    el.addEventListener("click",()=>{ focusEl(el); activateEl(el); });
     navEl.appendChild(el);
   });
-
-  // assemble rows: tile rows (COLS wide) + one nav row
-  rows = [];
-  const tiles = [...tilesEl.children];
-  let row = [];
-  tiles.forEach(el => { row.push(el); if(row.length === COLS){ rows.push(row); row = []; } });
-  if(row.length) rows.push(row);
-  rows.push([...navEl.children]);
-
-  cur = { r:0, c:0 };
-  focusCur();
+  rows=[ [...portEl.children], [...navEl.children] ];
+  cur={r:0,c:0}; focusCur();
 }
-
-function allEls(){ return rows.reduce((a,r)=>a.concat(r), []); }
+function allEls(){ return rows.reduce((a,r)=>a.concat(r),[]); }
 function focusCur(){
-  allEls().forEach(e => e.classList.remove("focused"));
-  const row = rows[cur.r]; if(!row) return;
-  if(cur.c >= row.length) cur.c = row.length - 1;
-  const el = row[cur.c];
-  if(el){ el.classList.add("focused"); el.focus(); }
+  allEls().forEach(e=>e.classList.remove("focused"));
+  const row=rows[cur.r]; if(!row) return; if(cur.c>=row.length) cur.c=row.length-1;
+  const el=row[cur.c]; if(el){ el.classList.add("focused"); el.focus(); }
 }
-function focusEl(el){
-  rows.forEach((r,ri)=>{ const ci = r.indexOf(el); if(ci !== -1){ cur = { r:ri, c:ci }; } });
-  focusCur();
-}
+function focusEl(el){ rows.forEach((r,ri)=>{ const ci=r.indexOf(el); if(ci!==-1) cur={r:ri,c:ci}; }); focusCur(); }
 function move(dir){
-  const row = rows[cur.r]; if(!row) return;
-  if(dir === "left")  cur.c = (cur.c - 1 + row.length) % row.length;
-  if(dir === "right") cur.c = (cur.c + 1) % row.length;
-  if(dir === "up")    cur.r = Math.max(0, cur.r - 1);
-  if(dir === "down")  cur.r = Math.min(rows.length - 1, cur.r + 1);
+  const row=rows[cur.r]; if(!row) return;
+  if(dir==="left")  cur.c=(cur.c-1+row.length)%row.length;
+  if(dir==="right") cur.c=(cur.c+1)%row.length;
+  if(dir==="up")    cur.r=Math.max(0,cur.r-1);
+  if(dir==="down")  cur.r=Math.min(rows.length-1,cur.r+1);
   focusCur();
 }
-
-document.addEventListener("keydown", e=>{
+document.addEventListener("keydown",e=>{
   switch(e.keyCode){
-    case 37: move("left");  e.preventDefault(); break;
+    case 37: move("left"); e.preventDefault(); break;
     case 39: move("right"); e.preventDefault(); break;
-    case 38: move("up");    e.preventDefault(); break;
-    case 40: move("down");  e.preventDefault(); break;
-    case 13: { const el = rows[cur.r] && rows[cur.r][cur.c]; if(el) activateEl(el); e.preventDefault(); break; } // OK
-    case 10009: e.preventDefault(); break; // swallow Tizen BACK so it doesn't drop the launcher
+    case 38: move("up"); e.preventDefault(); break;
+    case 40: move("down"); e.preventDefault(); break;
+    case 13: { const el=rows[cur.r]&&rows[cur.r][cur.c]; if(el) activateEl(el); e.preventDefault(); break; }
+    case 10009: e.preventDefault(); break;
   }
 });
-
 build();
 </script>
 </body>
