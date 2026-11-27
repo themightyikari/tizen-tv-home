@@ -150,14 +150,8 @@
 </head>
 <body>
 
-<!-- ===== Aquarium scene (artist PNG art, v2 living water) ===== -->
-<div id="bg"></div>
-<div id="godrays"></div>
-<div id="caustics"><div class="c a"></div></div>
-<div id="kelp"></div>
+<!-- ===== Aquarium scene: the ENTIRE scene (background, god-rays, caustics, plants, creatures, scrim) is drawn on this ONE canvas by the engine; only the UI below stays DOM on top ===== -->
 <canvas id="life"></canvas>
-<div id="front"></div>
-<div id="scrim"></div>
 
 <div class="wrap">
   <header>
@@ -249,12 +243,14 @@ async function loadWeather(){
 }
 loadWeather(); setInterval(loadWeather,15*60*1000);
 
-/* ================== aquarium life — Canvas-2D engine ==================
-   Every creature is drawn on ONE <canvas> (id="life") by a single rAF loop. Each gains:
-   a depth value (far = smaller, slower, hazier), a gently curved swim path, per-instance
-   colour, a come-and-go lifecycle, and — new in v4 — a real BANKING TURN: instead of an
-   instant mirror-flip, a fish plays a right->left turn sheet once to reverse heading.
-   Config here; engine further down. Plants/anemone/bubble-columns stay in DOM. */
+/* ================== aquarium — ONE-CANVAS composite engine (v1.13.0, 2026-11-27) ==================
+   PERF REWRITE: the WHOLE scene — painted background, god-rays, caustics, kelp, fish, coral, anemone,
+   bubble-columns, bubbles and the readability scrim — is drawn on ONE <canvas id="life"> at LIFE_RES
+   each frame, in z-order; only the clock/weather/app UI stays DOM on top. This removes the old cost of
+   the weak TV GPU compositing a STACK of big full-screen DOM layers every frame (fill-rate bound), AND
+   drops the background + caustics to the same reduced render resolution as the fish. On top of that,
+   fewer creatures are on screen at once (longer off-screen waits). Creatures keep the v4 art + banking
+   turns. Config here; scene draw-helpers + loop below. Plants/anemone/bubble-cols now draw on the canvas. */
 const LIFE={
   // v4 "believable reef" (2026-11-27): whole cast re-rendered — supersampled then downsampled
   // to delivery for crisp detail — with genuine banking TURN sheets. Specs straight from
@@ -276,7 +272,7 @@ const LIFE={
       swim:{f:"v4_angelfish_swim.png",     n:20,fps:8, cols:4}, tn:{f:"v4_angelfish_turn.png",     n:12,fps:10,cols:3}},
     {k:"turtle",        fw:352,fh:236, anchorY:.375, s:.89,  band:[.50,.70], spd:38, turn:.35,
       swim:{f:"v4_turtle_swim.png",        n:20,fps:6, cols:4}, tn:{f:"v4_turtle_turn.png",        n:12,fps:10,cols:3}},
-    {k:"reef_schooler", fw:104,fh:72,  anchorY:.468, s:.85,  band:[.18,.42], spd:78, turn:.50, count:6,
+    {k:"reef_schooler", fw:104,fh:72,  anchorY:.468, s:.85,  band:[.18,.42], spd:78, turn:.50, count:3,
       swim:{f:"v4_reef_schooler_swim.png", n:18,fps:15,cols:3}, tn:{f:"v4_reef_schooler_turn.png", n:12,fps:12,cols:3}},
     {k:"crab",          fw:144,fh:96,  anchorY:.374, s:.69,  band:[.885,.915], spd:22, turn:.40, flat:true,
       swim:{f:"v4_crab_swim.png",          n:12,fps:8, cols:3}, tn:{f:"v4_crab_turn.png",          n:14,fps:12,cols:2}},
@@ -309,40 +305,68 @@ const BUBBLECOL=[
   {f:"bubble_column_strip.png", fw:96, fh:256, n:16, fps:6, leftvw:85, bottomvh:1, s:.7},
 ];
 
-/* build the per-sprite frame-cycling CSS + inner HTML */
-let _css="";
-function frameCSS(id, c){
-  const cdur=(c.n/c.fps);
-  if(c.cols){
-    const W=c.fw*c.cols, H=c.fh*c.rows;
-    _css+=`@keyframes ay_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(0,-${H}px,0);}}`
-        +`@keyframes ax_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(-${W}px,0,0);}}`
-        +`.ay_${id}{width:${W}px;height:${H}px;animation:ay_${id} ${cdur}s steps(${c.rows}) infinite;}`
-        +`.ax_${id}{width:${W}px;height:${H}px;background:url(${c.f}) 0 0/100% 100% no-repeat;`
-        +`animation:ax_${id} ${cdur/c.rows}s steps(${c.cols}) infinite;}`;
-    return `<div class="ay_${id}"><div class="ax_${id}"></div></div>`;
-  }
-  const W=c.fw*c.n;
-  _css+=`@keyframes cyc_${id}{from{transform:translate3d(0,0,0);}to{transform:translate3d(-${W}px,0,0);}}`
-      +`.cyc_${id}{width:${W}px;height:${c.fh}px;background:url(${c.f}) 0 0/100% 100% no-repeat;`
-      +`animation:cyc_${id} ${cdur}s steps(${c.n}) infinite;}`;
-  return `<div class="cyc_${id}"></div>`;
-}
-
-/* ---- Canvas-2D engine: one loop draws every creature with depth + curved paths ---- */
+/* ---- one-canvas engine: image cache + sizing ---- */
 const _imgs={};
 function gimg(src){ let im=_imgs[src]; if(!im){ im=new Image(); im.src=src; _imgs[src]=im; } return im; }
 const cv=document.getElementById("life"), cx=cv.getContext("2d");
 let CW=0, CH=0, CS=1;
-const LIFE_RES=0.70;  // v1.11.2: nudged 0.62->0.70 for crispness (fewer concurrent creatures frees the fill-rate). If the TV janks, THIS is the first dial to turn back down.
-function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=Math.round(w*LIFE_RES); CH=cv.height=Math.round(h*LIFE_RES); CS=CW/1920; }
+const LIFE_RES=0.70;  // v1.13.0: ONE dial now scales the WHOLE scene (bg+caustics+plants+fish), not just the fish. Biggest perf dial — drop toward 0.55 if the TV still janks (a softer painted background is the trade).
+function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=Math.round(w*LIFE_RES); CH=cv.height=Math.round(h*LIFE_RES); CS=CW/1920; buildScene(); }
 window.addEventListener("resize",sizeLife);
 const rnd=(a,b)=>a+Math.random()*(b-a);
 
+/* ---- scene art, all drawn on the one canvas back-to-front ---- */
+const SCENE={ bg:"reef_background.png", rays:"godrays_overlay.png", caust:"caustics_tile.png" };
+function preloadScene(){ [SCENE.bg,SCENE.rays,SCENE.caust,ANEM.f,LIFE.bubbleImg]
+  .concat(KELP.map(k=>k.f)).concat(CORAL.map(c=>c.f)).concat(BUBBLECOL.map(b=>b.f)).forEach(gimg); }
+// size-dependent caches (rebuilt by sizeLife): a scaled caustics tile->pattern + the scrim gradients
+let _caustPat=null, _caustTile=1, _scrimLin=null, _scrimRad=null;
+function buildScene(){
+  const im=gimg(SCENE.caust);
+  if(im.complete&&im.naturalWidth){               // old webviews can't scale a CanvasPattern -> bake a scaled tile canvas
+    _caustTile=Math.max(2,Math.round(820*CS));
+    const tc=document.createElement("canvas"); tc.width=_caustTile; tc.height=_caustTile;
+    tc.getContext("2d").drawImage(im,0,0,_caustTile,_caustTile);
+    _caustPat=cx.createPattern(tc,"repeat");
+  }
+  _scrimLin=cx.createLinearGradient(0,0,0,CH);
+  _scrimLin.addColorStop(0,"rgba(2,20,36,.30)"); _scrimLin.addColorStop(.24,"rgba(2,20,36,0)"); _scrimLin.addColorStop(1,"rgba(0,14,26,.32)");
+  _scrimRad=cx.createRadialGradient(CW*.5,CH*.40,Math.min(CW,CH)*.30, CW*.5,CH*.40,Math.max(CW,CH)*.72);
+  _scrimRad.addColorStop(0,"rgba(0,0,0,0)"); _scrimRad.addColorStop(1,"rgba(2,18,34,.24)");
+}
+function drawBg(){ const im=gimg(SCENE.bg);
+  if(im.complete&&im.naturalWidth){ const ir=im.naturalWidth/im.naturalHeight, cr=CW/CH; let w,h;
+    if(ir>cr){ h=CH; w=CH*ir; } else { w=CW; h=CW/ir; } cx.drawImage(im,(CW-w)/2,(CH-h)/2,w,h); }
+  else { cx.fillStyle="#072f49"; cx.fillRect(0,0,CW,CH); } }
+function drawRays(t){ const im=gimg(SCENE.rays); if(!im.complete||!im.naturalWidth) return;
+  const w=CW*1.3334, pan=150*CS*Math.sin(t*2*Math.PI/92);
+  cx.save(); cx.globalAlpha=.11; cx.drawImage(im,(CW-w)/2+pan,0,w,CH); cx.restore(); }
+function drawCaustics(t){ if(!_caustPat) return;
+  const topY=CH*.62, h=CH-topY, bands=6, panX=-(t*7*CS)%_caustTile, panY=-(t*5*CS)%_caustTile;
+  cx.save(); cx.fillStyle=_caustPat; cx.translate(panX,panY);
+  for(let i=0;i<bands;i++){ const f=(i+1)/bands; cx.globalAlpha=.34*f*f;   // fade in from the top (no hard edge)
+    cx.fillRect(-panX, topY+h*(i/bands)-panY, CW, h/bands+1); }
+  cx.restore(); }
+function drawKelp(t){ for(const k of KELP){ const im=gimg(k.f); if(!im.complete||!im.naturalWidth) continue;
+  const hpx=k.h/100*CH, wpx=im.naturalWidth*(hpx/im.naturalHeight), px=parseFloat(k.left)/100*CW+wpx/2, by=CH-k.bottom/100*CH;
+  const amp=(k.sway==="sway2"?2.1:k.sway==="sway3"?2:1.9)*Math.PI/180, ang=amp*Math.sin(t*2*Math.PI/k.dur+(k.delay||0));
+  cx.save(); cx.translate(px,by); cx.rotate(ang); cx.drawImage(im,-wpx/2,-hpx,wpx,hpx); cx.restore(); } }
+function drawCoral(){ for(const c of CORAL){ const im=gimg(c.f); if(!im.complete||!im.naturalWidth) continue;
+  const hpx=c.h/100*CH, wpx=im.naturalWidth*(hpx/im.naturalHeight), p=parseFloat(c.pos)/100*CW;
+  cx.drawImage(im, c.side==="left"?p:CW-p-wpx, CH-hpx, wpx, hpx); } }
+function drawAnemone(t){ const im=gimg(ANEM.f); if(!im.complete||!im.naturalWidth) return;
+  const fi=Math.floor(t*ANEM.fps)%ANEM.n, sx=(fi%ANEM.cols)*ANEM.fw, sy=((fi/ANEM.cols)|0)*ANEM.fh;
+  const dw=ANEM.fw*ANEM.s*CS, dh=ANEM.fh*ANEM.s*CS, px=ANEM.leftvw/100*CW, by=CH-ANEM.bottomvh/100*CH;
+  cx.drawImage(im, sx,sy,ANEM.fw,ANEM.fh, px-dw/2, by-dh, dw,dh); }
+function drawBubbleCols(t){ for(const bc of BUBBLECOL){ const im=gimg(bc.f); if(!im.complete||!im.naturalWidth) continue;
+  const fi=Math.floor(t*bc.fps)%bc.n, dw=bc.fw*bc.s*CS, dh=bc.fh*bc.s*CS, px=bc.leftvw/100*CW, by=CH-bc.bottomvh/100*CH;
+  cx.save(); cx.globalAlpha=.8; cx.drawImage(im, fi*bc.fw,0,bc.fw,bc.fh, px-dw/2, by-dh, dw,dh); cx.restore(); } }
+function drawScrim(){ if(_scrimRad){ cx.fillStyle=_scrimRad; cx.fillRect(0,0,CW,CH); } if(_scrimLin){ cx.fillStyle=_scrimLin; cx.fillRect(0,0,CW,CH); } }
+
 function Fish(sp){ this.sp=sp; this.im=gimg(sp.swim.f); this.imT=sp.tn?gimg(sp.tn.f):null;
   const now=performance.now()/1000; this.respawn(now);
-  if(Math.random()<.5){ this.x=rnd(.10,.90)*CW; this.turned=true; }  // begin mid-tank (no turn this crossing)
-  else { this.state="wait"; this.waitUntil=now+rnd(1,16); } }        // begin off-screen, enter soon
+  if(Math.random()<.20){ this.x=rnd(.10,.90)*CW; this.turned=true; } // begin mid-tank (no turn this crossing)
+  else { this.state="wait"; this.waitUntil=now+rnd(4,52); } }        // begin off-screen, trickle in slowly
 Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
 Fish.prototype.respawn=function(t){ const sp=this.sp;
   this.depth0=rnd(.3,1); this.depth=this.depth0; this.dir=(Math.random()<.5?1:-1);
@@ -382,7 +406,7 @@ Fish.prototype.step=function(t,dt){
      ((this.dir>0&&this.x>=this.turnAtX)||(this.dir<0&&this.x<=this.turnAtX))){ this.enterTurn(t); return; }
   const hw=this.sp.fw*this.sc()*.6;
   if((this.dir>0&&this.x>CW+hw)||(this.dir<0&&this.x<-hw)){
-    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?30:9, this.sp.rare?64:24); } };
+    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?55:22, this.sp.rare?120:52); } };  // longer gaps => ~3-4 creatures on screen at once
 Fish.prototype.draw=function(t){ if(this.state==="wait") return;
   const sp=this.sp; let im,N,fps,cols,fi;
   if(this.state==="turn"){ im=this.imT; N=sp.tn.n; fps=sp.tn.fps; cols=sp.tn.cols;
@@ -433,56 +457,22 @@ function lifeLoop(ms){ requestAnimationFrame(lifeLoop);
   const t=ms/1000; let dt=t-(_last||t); _last=t; if(dt>.08) dt=.08;
   _acc+=dt; if(_acc<1/30) return; const d=_acc; _acc=0;             // ~30fps cap
   for(const f of _fish) f.step(t,d); for(const j of _jelly) j.step(t,d); for(const b of _bub) b.step(t,d);
-  cx.clearRect(0,0,CW,CH);
+  // ===== composite the ENTIRE scene on one canvas, back to front (no DOM layers to blend) =====
+  drawBg(); drawRays(t); drawCaustics(t); drawKelp(t);             // bg -> god-rays -> caustics -> back plants
   const ds=[]; for(const f of _fish){ if(f.state!=="wait") ds.push(f); } for(const j of _jelly) ds.push(j);
-  ds.sort((a,b)=>a.depth-b.depth);                                 // far first
+  ds.sort((a,b)=>a.depth-b.depth);                                 // creatures, far first
   for(const o of ds) o.draw(t);
-  for(const b of _bub) b.draw(t); }
-function buildLife(){ sizeLife();
+  for(const b of _bub) b.draw(t);                                  // rising bubbles (mid)
+  drawCoral(); drawAnemone(t); drawBubbleCols(t);                  // foreground plants
+  drawScrim();                                                     // readability darkening (under the DOM UI)
+}
+function buildLife(){ preloadScene(); sizeLife();                  // sizeLife() runs buildScene() once images start loading
+  const ci=gimg(SCENE.caust); if(ci.addEventListener) ci.addEventListener("load",buildScene);  // rebuild the caustics pattern once its tile decodes
   LIFE.fish.forEach(sp=>{ const c=sp.count||1; for(let i=0;i<c;i++) _fish.push(new Fish(sp)); });  // count>1 => loose shoal
   LIFE.jelly.forEach((sp,i)=>_jelly.push(new Jelly(sp,i)));
-  for(let i=0;i<10;i++) _bub.push(new Bubble(true));
+  for(let i=0;i<6;i++) _bub.push(new Bubble(true));
   requestAnimationFrame(lifeLoop); }
-
-function buildPlants(){
-  const kelp=document.getElementById("kelp");
-  KELP.forEach(k=>{
-    const img=document.createElement("img"); img.src=k.f; img.alt="";
-    img.style.left=k.left; img.style.bottom=k.bottom+"vh"; img.style.height=k.h+"vh";
-    img.style.animation=k.sway+" "+k.dur+"s ease-in-out "+k.delay+"s infinite";
-    kelp.appendChild(img);
-  });
-  const front=document.getElementById("front");
-  CORAL.forEach(c=>{
-    const img=document.createElement("img"); img.src=c.f; img.alt=""; img.className="coral";
-    img.style.bottom="0"; img.style.height=c.h+"vh";
-    if(c.side==="right") img.style.right=c.pos; else img.style.left=c.pos;
-    front.appendChild(img);
-  });
-  // living anemone (animated atlas, anchored on the sand)
-  const inner=frameCSS("anem", ANEM);
-  const an=document.createElement("div"); an.className="anem";
-  an.style.left=ANEM.leftvw+"vw"; an.style.bottom=ANEM.bottomvh+"vh";
-  an.style.width=ANEM.fw+"px"; an.style.height=ANEM.fh+"px"; an.style.marginLeft=(-ANEM.fw/2)+"px";
-  an.innerHTML='<div class="fit" style="transform:scale('+ANEM.s+');">'
-    +'<div class="sprite" style="width:'+ANEM.fw+'px;height:'+ANEM.fh+'px;">'+inner+'</div></div>';
-  front.appendChild(an);
-  // rising bubble columns (by the coral)
-  BUBBLECOL.forEach((bc,i)=>{
-    const inner=frameCSS("bcol"+i, bc);
-    const el=document.createElement("div"); el.className="anem";
-    el.style.left=bc.leftvw+"vw"; el.style.bottom=bc.bottomvh+"vh";
-    el.style.width=bc.fw+"px"; el.style.height=bc.fh+"px"; el.style.marginLeft=(-bc.fw/2)+"px";
-    el.innerHTML='<div class="fit" style="transform:scale('+bc.s+');">'
-      +'<div class="sprite" style="width:'+bc.fw+'px;height:'+bc.fh+'px;">'+inner+'</div></div>';
-    front.appendChild(el);
-  });
-}
-
 buildLife();
-buildPlants();
-// inject all generated sprite keyframes/classes once
-const st=document.createElement("style"); st.textContent=_css; document.head.appendChild(st);
 
 /* ================== launcher / remote nav ================== */
 const SERVICE="http://127.0.0.1:8099";
