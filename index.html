@@ -272,7 +272,7 @@ const LIFE={
       swim:{f:"v4_angelfish_swim.png",     n:20,fps:8, cols:4}, tn:{f:"v4_angelfish_turn.png",     n:12,fps:10,cols:3}},
     {k:"turtle",        fw:352,fh:236, anchorY:.375, s:.89,  band:[.50,.70], spd:38, turn:.35,
       swim:{f:"v4_turtle_swim.png",        n:20,fps:6, cols:4}, tn:{f:"v4_turtle_turn.png",        n:12,fps:10,cols:3}},
-    {k:"reef_schooler", fw:104,fh:72,  anchorY:.468, s:.85,  band:[.18,.42], spd:78, turn:.50, count:3,
+    {k:"reef_schooler", fw:104,fh:72,  anchorY:.468, s:.85,  band:[.18,.42], spd:78, turn:.50, count:2,
       swim:{f:"v4_reef_schooler_swim.png", n:18,fps:15,cols:3}, tn:{f:"v4_reef_schooler_turn.png", n:12,fps:12,cols:3}},
     {k:"crab",          fw:144,fh:96,  anchorY:.374, s:.69,  band:[.885,.915], spd:22, turn:.40, flat:true,
       swim:{f:"v4_crab_swim.png",          n:12,fps:8, cols:3}, tn:{f:"v4_crab_turn.png",          n:14,fps:12,cols:2}},
@@ -281,10 +281,9 @@ const LIFE={
     {k:"eagle_ray",     fw:320,fh:200, anchorY:.446, s:1.19, band:[.28,.52], spd:40, turn:.30, rare:true,
       swim:{f:"v4_eagle_ray_swim.png",     n:18,fps:6, cols:3}, tn:{f:"v4_eagle_ray_turn.png",     n:12,fps:10,cols:3}},
   ],
-  // both jellies share ONE pulse texture (loaded once); the second is a smaller cool-tinted alias
+  // ONE jelly on screen at a time (owner request); it roams the mid-tank instead of parking in a corner
   jelly:[
-    {f:"v4_jellyfish_pulse.png", fw:192,fh:272, n:16,fps:6, cols:4, anchorY:.297, s:1.08},
-    {f:"v4_jellyfish_pulse.png", fw:192,fh:272, n:16,fps:6, cols:4, anchorY:.297, s:.70, tint:-22},
+    {f:"v4_jellyfish_pulse.png", fw:192,fh:272, n:16,fps:6, cols:4, anchorY:.297, s:1.06},
   ],
   bubbleImg:"bubble.png",
 };
@@ -310,7 +309,7 @@ const _imgs={};
 function gimg(src){ let im=_imgs[src]; if(!im){ im=new Image(); im.src=src; _imgs[src]=im; } return im; }
 const cv=document.getElementById("life"), cx=cv.getContext("2d");
 let CW=0, CH=0, CS=1;
-const LIFE_RES=0.70;  // v1.13.0: ONE dial now scales the WHOLE scene (bg+caustics+plants+fish), not just the fish. Biggest perf dial — drop toward 0.55 if the TV still janks (a softer painted background is the trade).
+const LIFE_RES=0.60;  // v1.13.1: dropped 0.70->0.60 (owner: still laggy). ONE dial scales the WHOLE scene (bg+caustics+plants+fish). Biggest perf dial — go toward 0.52 if still janky (a softer painted background is the trade).
 function sizeLife(){ const w=window.innerWidth||1920, h=window.innerHeight||1080; CW=cv.width=Math.round(w*LIFE_RES); CH=cv.height=Math.round(h*LIFE_RES); CS=CW/1920; buildScene(); }
 window.addEventListener("resize",sizeLife);
 const rnd=(a,b)=>a+Math.random()*(b-a);
@@ -365,8 +364,8 @@ function drawScrim(){ if(_scrimRad){ cx.fillStyle=_scrimRad; cx.fillRect(0,0,CW,
 
 function Fish(sp){ this.sp=sp; this.im=gimg(sp.swim.f); this.imT=sp.tn?gimg(sp.tn.f):null;
   const now=performance.now()/1000; this.respawn(now);
-  if(Math.random()<.20){ this.x=rnd(.10,.90)*CW; this.turned=true; } // begin mid-tank (no turn this crossing)
-  else { this.state="wait"; this.waitUntil=now+rnd(4,52); } }        // begin off-screen, trickle in slowly
+  if(Math.random()<.12){ this.x=rnd(.10,.90)*CW; this.turned=true; } // begin mid-tank (no turn this crossing)
+  else { this.state="wait"; this.waitUntil=now+rnd(6,90); } }        // begin off-screen, trickle in slowly
 Fish.prototype.sc=function(){ return this.sp.s*(.5+.55*this.depth)*CS; };   // live scale (CS may change on resize)
 Fish.prototype.respawn=function(t){ const sp=this.sp;
   this.depth0=rnd(.3,1); this.depth=this.depth0; this.dir=(Math.random()<.5?1:-1);
@@ -406,7 +405,7 @@ Fish.prototype.step=function(t,dt){
      ((this.dir>0&&this.x>=this.turnAtX)||(this.dir<0&&this.x<=this.turnAtX))){ this.enterTurn(t); return; }
   const hw=this.sp.fw*this.sc()*.6;
   if((this.dir>0&&this.x>CW+hw)||(this.dir<0&&this.x<-hw)){
-    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?55:22, this.sp.rare?120:52); } };  // longer gaps => ~3-4 creatures on screen at once
+    this.state="wait"; this.waitUntil=t+rnd(this.sp.rare?110:50, this.sp.rare?220:120); } };  // long off-screen gaps => ~2-3 fish on screen at once (fish cross slowly, so they linger)
 Fish.prototype.draw=function(t){ if(this.state==="wait") return;
   const sp=this.sp; let im,N,fps,cols,fi;
   if(this.state==="turn"){ im=this.imT; N=sp.tn.n; fps=sp.tn.fps; cols=sp.tn.cols;
@@ -430,7 +429,7 @@ Fish.prototype.draw=function(t){ if(this.state==="wait") return;
   cx.drawImage(im, sx+0.5,sy+0.5, sp.fw-1,sp.fh-1, -sp.fw/2,oy, sp.fw,sp.fh); cx.restore(); };
 
 function Jelly(sp,i){ this.sp=sp; this.im=gimg(sp.f); this.depth=rnd(.55,.95);
-  this.oxf=(i===0?.18:.82); this.oyf=(i===0?.26:.30); this.axf=rnd(.03,.06); this.ayf=rnd(.10,.18);
+  this.oxf=.5; this.oyf=rnd(.24,.34); this.axf=rnd(.20,.30); this.ayf=rnd(.08,.16);   // roams the mid-tank (sweeps ~left/right)
   this.fx=rnd(.03,.06); this.fy=rnd(.04,.07); this.px=rnd(0,6.28); this.py=rnd(0,6.28);
   this.t0=performance.now()/1000-rnd(0,10); this.x=this.oxf*CW; this.y=this.oyf*CH; }
 Jelly.prototype.step=function(t,dt){ this.x=(this.oxf+this.axf*Math.sin(t*this.fx+this.px))*CW; this.y=(this.oyf+this.ayf*Math.sin(t*this.fy+this.py))*CH; };
